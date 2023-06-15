@@ -1,0 +1,669 @@
+---
+title: "Data Analysis Paper 1"
+author: "Montserrat Valdivia"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(dplyr)
+library(TAM)
+library(R.utils)
+library(reshape2)
+```
+
+
+```{r}
+DIF_conditions = list(
+  # BASELINE - No DIF percentage or magnitude for each difficulty level (bb)
+  d01 = list(mm = 0,  pp =   0, ll = "Core",    rp = 1), 
+  d02 = list(mm = 0,  pp =   0, ll = "Stage 1", rp = 1), 
+  d03 = list(mm = 0,  pp =   0, ll = "Stage 2", rp = 1),
+  d04 = list(mm = 0,  pp =   0, ll = "Core",    rp = .7), 
+  d05 = list(mm = 0,  pp =   0, ll = "Stage 1", rp = .7), 
+  d06 = list(mm = 0,  pp =   0, ll = "Stage 2", rp = .7), 
+  d07 = list(mm = 0,  pp =   0, ll = "Core",    rp = .5), 
+  d08 = list(mm = 0,  pp =   0, ll = "Stage 1", rp = .5), 
+  d09 = list(mm = 0,  pp =   0, ll = "Stage 2", rp = .5),   
+  # Different combinations of DIF when DIF is only on the Core module
+  d10 = list(mm = .30,  pp = 1/12, ll = "Core", rp = 1),
+  d11 = list(mm = .60,  pp = 1/12, ll = "Core", rp = 1),
+  d12 = list(mm = 1.40, pp = 1/12, ll = "Core", rp = 1),
+  d13 = list(mm = .30,  pp = 3/12, ll = "Core", rp = 1),
+  d14 = list(mm = .60,  pp = 3/12, ll = "Core", rp = 1),
+  d15 = list(mm = 1.40, pp = 3/12, ll = "Core", rp = 1),
+  d16 = list(mm = .30,  pp = 5/12, ll = "Core", rp = 1),
+  d17 = list(mm = .60,  pp = 5/12, ll = "Core", rp = 1),
+  d18 = list(mm = 1.40, pp = 5/12, ll = "Core", rp = 1),
+  d19 = list(mm = .30,  pp = 1/12, ll = "Core", rp = .7),
+  d20 = list(mm = .60,  pp = 1/12, ll = "Core", rp = .7),
+  d21 = list(mm = 1.40, pp = 1/12, ll = "Core", rp = .7),
+  d22 = list(mm = .30,  pp = 3/12, ll = "Core", rp = .7),
+  d23 = list(mm = .60,  pp = 3/12, ll = "Core", rp = .7),
+  d24 = list(mm = 1.40, pp = 3/12, ll = "Core", rp = .7),
+  d25 = list(mm = .30,  pp = 5/12, ll = "Core", rp = .7),
+  d26 = list(mm = .60,  pp = 5/12, ll = "Core", rp = .7),
+  d27 = list(mm = 1.40, pp = 5/12, ll = "Core", rp = .7),
+  d28 = list(mm = .30,  pp = 1/12, ll = "Core", rp = .5),
+  d29 = list(mm = .60,  pp = 1/12, ll = "Core", rp = .5),
+  d30 = list(mm = 1.40, pp = 1/12, ll = "Core", rp = .5),
+  d31 = list(mm = .30,  pp = 3/12, ll = "Core", rp = .5),
+  d32 = list(mm = .60,  pp = 3/12, ll = "Core", rp = .5),
+  d33 = list(mm = 1.40, pp = 3/12, ll = "Core", rp = .5),
+  d34 = list(mm = .30,  pp = 5/12, ll = "Core", rp = .5),
+  d35 = list(mm = .60,  pp = 5/12, ll = "Core", rp = .5),
+  d36 = list(mm = 1.40, pp = 5/12, ll = "Core", rp = .5),
+  # Different combinations of DIF when DIF is only on the Stage 1 modules
+  d37 = list(mm = .30,  pp = 1/12, ll = "Stage 1", rp = 1),
+  d38 = list(mm = .60,  pp = 1/12, ll = "Stage 1", rp = 1),
+  d39 = list(mm = 1.40, pp = 1/12, ll = "Stage 1", rp = 1),
+  d40 = list(mm = .30,  pp = 3/12, ll = "Stage 1", rp = 1),
+  d41 = list(mm = .60,  pp = 3/12, ll = "Stage 1", rp = 1),
+  d42 = list(mm = 1.40, pp = 3/12, ll = "Stage 1", rp = 1),
+  d43 = list(mm = .30,  pp = 5/12, ll = "Stage 1", rp = 1),
+  d44 = list(mm = .60,  pp = 5/12, ll = "Stage 1", rp = 1),
+  d45 = list(mm = 1.40, pp = 5/12, ll = "Stage 1", rp = 1),
+  d46 = list(mm = .30,  pp = 1/12, ll = "Stage 1", rp = .7),
+  d47 = list(mm = .60,  pp = 1/12, ll = "Stage 1", rp = .7),
+  d48 = list(mm = 1.40, pp = 1/12, ll = "Stage 1", rp = .7),
+  d49 = list(mm = .30,  pp = 3/12, ll = "Stage 1", rp = .7),
+  d50 = list(mm = .60,  pp = 3/12, ll = "Stage 1", rp = .7),
+  d51 = list(mm = 1.40, pp = 3/12, ll = "Stage 1", rp = .7),
+  d52 = list(mm = .30,  pp = 5/12, ll = "Stage 1", rp = .7),
+  d53 = list(mm = .60,  pp = 5/12, ll = "Stage 1", rp = .7),
+  d54 = list(mm = 1.40, pp = 5/12, ll = "Stage 1", rp = .7),
+  d55 = list(mm = .30,  pp = 1/12, ll = "Stage 1", rp = .5),
+  d56 = list(mm = .60,  pp = 1/12, ll = "Stage 1", rp = .5),
+  d57 = list(mm = 1.40, pp = 1/12, ll = "Stage 1", rp = .5),
+  d58 = list(mm = .30,  pp = 3/12, ll = "Stage 1", rp = .5),
+  d59 = list(mm = .60,  pp = 3/12, ll = "Stage 1", rp = .5),
+  d60 = list(mm = 1.40, pp = 3/12, ll = "Stage 1", rp = .5),
+  d61 = list(mm = .30,  pp = 5/12, ll = "Stage 1", rp = .5),
+  d62 = list(mm = .60,  pp = 5/12, ll = "Stage 1", rp = .5),
+  d63 = list(mm = 1.40, pp = 5/12, ll = "Stage 1", rp = .5),
+  # Different combinations of DIF when DIF is only on the Stage 2 modules
+  d64 = list(mm = .30,  pp = 1/12, ll = "Stage 2", rp = 1),
+  d65 = list(mm = .60,  pp = 1/12, ll = "Stage 2", rp = 1),
+  d66 = list(mm = 1.40, pp = 1/12, ll = "Stage 2", rp = 1),
+  d67 = list(mm = .30,  pp = 3/12, ll = "Stage 2", rp = 1),
+  d68 = list(mm = .60,  pp = 3/12, ll = "Stage 2", rp = 1),
+  d69 = list(mm = 1.40, pp = 3/12, ll = "Stage 2", rp = 1),
+  d70 = list(mm = .30,  pp = 5/12, ll = "Stage 2", rp = 1),
+  d71 = list(mm = .60,  pp = 5/12, ll = "Stage 2", rp = 1),
+  d72 = list(mm = 1.40, pp = 5/12, ll = "Stage 2", rp = 1),
+  d73 = list(mm = .30,  pp = 1/12, ll = "Stage 2", rp = .7),
+  d74 = list(mm = .60,  pp = 1/12, ll = "Stage 2", rp = .7),
+  d75 = list(mm = 1.40, pp = 1/12, ll = "Stage 2", rp = .7),
+  d76 = list(mm = .30,  pp = 3/12, ll = "Stage 2", rp = .7),
+  d77 = list(mm = .60,  pp = 3/12, ll = "Stage 2", rp = .7),
+  d78 = list(mm = 1.40, pp = 3/12, ll = "Stage 2", rp = .7),
+  d79 = list(mm = .30,  pp = 5/12, ll = "Stage 2", rp = .7),
+  d80 = list(mm = .60,  pp = 5/12, ll = "Stage 2", rp = .7),
+  d81 = list(mm = 1.40, pp = 5/12, ll = "Stage 2", rp = .7),
+  d82 = list(mm = .30,  pp = 1/12, ll = "Stage 2", rp = .5),
+  d83 = list(mm = .60,  pp = 1/12, ll = "Stage 2", rp = .5),
+  d84 = list(mm = 1.40, pp = 1/12, ll = "Stage 2", rp = .5),
+  d85 = list(mm = .30,  pp = 3/12, ll = "Stage 2", rp = .5),
+  d86 = list(mm = .60,  pp = 3/12, ll = "Stage 2", rp = .5),
+  d87 = list(mm = 1.40, pp = 3/12, ll = "Stage 2", rp = .5),
+  d88 = list(mm = .30,  pp = 5/12, ll = "Stage 2", rp = .5),
+  d89 = list(mm = .60,  pp = 5/12, ll = "Stage 2", rp = .5),
+  d90 = list(mm = 1.40, pp = 5/12, ll = "Stage 2", rp = .5)
+)
+
+```
+
+```{r}
+path2 = "C:/Users/Montse/OneDrive - Indiana University/Dissertation/Data Analysis/Paper 1"
+# Call true item parameters
+itembank = read.csv(paste0(path2, "/Data/item bank for modules.csv"), header = T)
+items = data.frame(itemN = paste0("i", 1:nrow(itembank)),
+                   module = itembank$module,
+                   a = itembank$Slope,
+                   b = itembank$Location,
+                   c = 0, 
+                   d = 1)
+
+```
+
+```{r}
+path = "C:/Users/Montse/OneDrive - Indiana University/Dissertation/Data Analysis/Paper 1/Results/Generated responses/"
+
+path1 = "C:/Users/Montse/OneDrive - Indiana University/Dissertation/Data Analysis/Paper 1/Results/"
+
+
+
+bias = function(est, gen){
+  bias = est - gen
+  return(bias)
+}
+
+# rmse = function(est, gen){
+#   rmse = sqrt(mean((est - gen)^2))
+#   return(rmse)
+# }
+
+data_analysis = function(ii, dd, cntry){
+  # select from DIF conditions 
+  mm = DIF_conditions[[dd]][[1]] # DIF magnitude
+  pp = DIF_conditions[[dd]][[2]] # DIF percentage
+  ll = DIF_conditions[[dd]][[3]] # DIF location
+  rp = DIF_conditions[[dd]][[4]] # routing probability
+  
+  #DIF location 
+  if (cntry == "high"){
+  a = loadObject(paste0(path, "responses_c", dd, "_N4000_Country1_r", ii,".Rbin"))
+  b = loadObject(paste0(path, "responses_c", dd, "_N4000_Country2_r", ii,".Rbin"))
+  c = loadObject(paste0(path, "responses_c", dd, "_N4000_Country3_r", ii,".Rbin"))
+  } else if (cntry == "med"){
+  d = loadObject(paste0(path, "responses_c", dd, "_N4000_Country4_r", ii,".Rbin"))
+  e = loadObject(paste0(path, "responses_c", dd, "_N4000_Country5_r", ii,".Rbin"))
+  f = loadObject(paste0(path, "responses_c", dd, "_N4000_Country6_r", ii,".Rbin"))
+  } else if (cntry == "low"){
+  g = loadObject(paste0(path, "responses_c", dd, "_N4000_Country7_r", ii,".Rbin"))
+  h = loadObject(paste0(path, "responses_c", dd, "_N4000_Country8_r", ii,".Rbin"))
+  i = loadObject(paste0(path, "responses_c", dd, "_N4000_Country9_r", ii,".Rbin"))
+  } 
+  
+  #Baseline conditions 
+  if (ll == "Core" & rp == 1){dd1 = 1
+    } else if (ll ==  "Stage 1" & rp == 1){dd1 = 2
+    } else if (ll ==  "Stage 2" & rp == 1){dd1 = 3
+    } else if (ll == "Core" & rp == .7){dd1 = 4
+    } else if (ll == "Stage 1" & rp == .7){dd1 = 5
+    } else if (ll == "Stage 2" & rp == .7){dd1 = 6
+    } else if (ll == "Core" & rp == .5){dd1 = 7
+    } else if (ll == "Stage 1" & rp == .5){dd1 = 8
+    } else if (ll == "Stage 2" & rp == .5){dd1 = 9
+    } 
+  
+  if (cntry == "high"){
+  d = loadObject(paste0(path, "responses_c", dd1, "_N4000_Country4_r", ii,".Rbin"))
+  e = loadObject(paste0(path, "responses_c", dd1, "_N4000_Country5_r", ii,".Rbin"))
+  f = loadObject(paste0(path, "responses_c", dd1, "_N4000_Country6_r", ii,".Rbin"))
+  g = loadObject(paste0(path, "responses_c", dd1, "_N4000_Country7_r", ii,".Rbin"))
+  h = loadObject(paste0(path, "responses_c", dd1, "_N4000_Country8_r", ii,".Rbin"))
+  i = loadObject(paste0(path, "responses_c", dd1, "_N4000_Country9_r", ii,".Rbin"))  
+  } else if (cntry == "med"){
+  a = loadObject(paste0(path, "responses_c", dd1, "_N4000_Country1_r", ii,".Rbin"))
+  b = loadObject(paste0(path, "responses_c", dd1, "_N4000_Country2_r", ii,".Rbin"))
+  c = loadObject(paste0(path, "responses_c", dd1, "_N4000_Country3_r", ii,".Rbin"))
+  g = loadObject(paste0(path, "responses_c", dd1, "_N4000_Country7_r", ii,".Rbin"))
+  h = loadObject(paste0(path, "responses_c", dd1, "_N4000_Country8_r", ii,".Rbin"))
+  i = loadObject(paste0(path, "responses_c", dd1, "_N4000_Country9_r", ii,".Rbin"))
+  } else if (cntry == "low"){
+  a = loadObject(paste0(path, "responses_c", dd1, "_N4000_Country1_r", ii,".Rbin"))
+  b = loadObject(paste0(path, "responses_c", dd1, "_N4000_Country2_r", ii,".Rbin"))
+  c = loadObject(paste0(path, "responses_c", dd1, "_N4000_Country3_r", ii,".Rbin"))
+  d = loadObject(paste0(path, "responses_c", dd1, "_N4000_Country4_r", ii,".Rbin"))
+  e = loadObject(paste0(path, "responses_c", dd1, "_N4000_Country5_r", ii,".Rbin"))
+  f = loadObject(paste0(path, "responses_c", dd1, "_N4000_Country6_r", ii,".Rbin"))
+  } 
+  
+  data = rbind(a,b,c,d,e,f,g,h,i)
+  
+
+  ##=======================================================================##
+  ## Item parameter estimation                                             ##
+  ##=======================================================================##
+  tam.mod <- TAM::tam.mml.2pl( data[, paste0("i.", 1:72)],
+                             irtmodel = "2PL",
+                             est.variance = FALSE, # this should be false
+                             control = list(maxiter = 10000), verbose = F)
+
+  
+  save(tam.mod, file = paste0(path1, "TAM/tam_estimated_c", dd, "_mm", mm, "_pp", pp,
+                              "_ll", ll, "_rp", rp, "_DIFcnt", cntry,"_r", ii, ".RData"))
+  
+  # generated items
+  # No DIF
+  items = items
+  
+  test_length = nrow(items)/6
+  # DIF conditions matrix per module
+  addDIF<-data.frame(V1 = c(rep(0, test_length)), # for discrimination parameter
+                     V2 = c(rep(mm, round(test_length*pp, 0)), # for first location
+                               rep(0, round(test_length*(1-pp),0))),   #parameters
+                     V3 = c(rep(0, test_length)),
+                     V4 = c(rep(0, test_length)))
+  #matrix of zeros
+  zeros_m<-data.frame(V1 = c(rep(0, test_length)), # for discrimination parameter
+                     V2 = c(rep(0, test_length)),
+                     V3 = c(rep(0, test_length)),
+                     V4 = c(rep(0, test_length)))
+  
+  #DIF location 
+  if (ll == "Core"){
+  addDIF1 <- rbind(addDIF, zeros_m, zeros_m, zeros_m, zeros_m, zeros_m)  
+  }else if(ll == "Stage 1"){
+  addDIF1 <- rbind(zeros_m, addDIF, addDIF, zeros_m, zeros_m, zeros_m)    
+  }else if(ll == "Stage 2"){
+  addDIF1 <- rbind(zeros_m, zeros_m, zeros_m, addDIF, addDIF, addDIF)  
+  }
+  
+  
+  # adding DIF to the difficulty parameter only according to country with DIF 
+  if (cntry == "high"){             # high performers
+    items_dif = as.data.frame(items[3:ncol(items)] - addDIF1)
+  }else if (cntry %in% c("med", "low")){ # medium and low performers
+    items_dif = as.data.frame(items[3:ncol(items)] + addDIF1)
+  }else {                # Baseline
+    items_dif = as.data.frame(items[3:ncol(items)])  
+    }
+  
+  
+  ## mean - sigma
+  est_a = tam.mod[["item_irt"]]$alpha
+  est_b = tam.mod[["item_irt"]]$beta
+
+  u <- mean(est_a)/mean(items$a)
+  v <- mean(items$b) - u*mean(est_b)
+
+  rs_est_a <- est_a/u          #rescaled item discrimination
+  rs_est_b <- u*est_b + v      #rescaled item difficulty
+
+  # to fixed the item paremeters, they need to be in a specific format
+  # For subsequent use of item difficulty
+  xsi.fixed = cbind( 1:(length(rs_est_b)), rs_est_b)
+
+  # For subsequent use of slopes
+  slope = data.frame(ID = 1:length(rs_est_a),
+                     "1" = 0,
+                     "2" = rs_est_a)
+
+  slope1 = melt(slope, id.vars = c("ID"), measure.vars = c("X1", "X2"))
+  slope1 = slope1[order(slope1$ID, decreasing = FALSE),]
+  B.fixed = data.matrix(data.frame(ID = slope1$ID,
+                                   a =  ifelse(slope1$variable == "X1", 1, 2),
+                                   b = 1,
+                                   c = slope1$value),
+                        rownames.force = NA)
+  
+  # Item parameters for group 1 and group 2
+  Allitems = data.frame(rep = ii, 
+                        condition = dd,
+                        DIFmag = mm,
+                        DIFper = pp,
+                        DIFloc = ll, 
+                        DIFcntry = cntry, 
+                        Prob = rp,
+                        N = 4000,
+                        item = paste0("i", 1:72),
+                        items, items_dif, est_a, est_b, rs_est_a, rs_est_b)
+  
+  Allitems1 = Allitems %>%
+    summarise(bias_a = round(rs_est_a - a.1, 4),
+              bias_b = round(rs_est_b - b.1, 4),
+              rmse_a = round(sqrt((rs_est_a - a.1)^2), 4),
+              rmse_b = round(sqrt((rs_est_b - b.1)^2), 4))
+  
+  Allitems2 = cbind(Allitems, Allitems1)
+  saveObject(Allitems2, file = paste0(path1, "items/items_c", dd, "_mm", mm, "_pp", pp,
+                              "_ll", ll, "_rp", rp, "_DIFcnt", cntry,"_r", ii, ".Rbin"))
+  ##=======================================================================##
+  ## Proficiency estimation with fixed item parameters                     ##
+  ##=======================================================================##
+  
+  tam.mod.mg <- TAM::tam.mml.2pl( data[, paste0("i.", 1:72)], 
+                                  irtmodel = "2PL",
+                                  est.variance = T, 
+                                  group = data$DIFcntry,
+                                  #three next lines of code based on mean sigma rescaling
+                                  xsi.inits = xsi.fixed, 
+                                  xsi.fixed = xsi.fixed,
+                                  B.fixed = B.fixed,
+                                  control = list(maxiter = 10000), verbose = F)
+  
+  pvmod <- TAM::tam.pv( tam.mod.mg, 
+                        nplausible = 10, #10 plausible values
+                        samp.regr = TRUE)
+  
+  data1 <- cbind(data, pvmod$pv)
+  
+  data1a = add_column(data1, Country = NA, .after = 1)
+  data1a = data1a%>%
+    mutate(Country = DIFcntry,
+           DIFcntry = cntry)
+  
+  data2 = data1 %>%
+    group_by(DIFcntry) %>%
+    summarise(TH0 = mean(TH0),
+              PV1 = mean(PV1.Dim1),
+              PV2 = mean(PV2.Dim1),
+              PV3 = mean(PV3.Dim1),
+              PV4 = mean(PV4.Dim1),
+              PV5 = mean(PV5.Dim1),
+              PV6 = mean(PV6.Dim1),
+              PV7 = mean(PV7.Dim1),
+              PV8 = mean(PV8.Dim1),
+              PV9 = mean(PV9.Dim1),
+              PV10 = mean(PV10.Dim1))
+  
+  data3 = data2 %>%
+    group_by(DIFcntry) %>%
+    summarise(bPV1 = bias(est = PV1, gen = TH0),
+              bPV2 = bias(est = PV2, gen = TH0),
+              bPV3 = bias(est = PV3, gen = TH0),
+              bPV4 = bias(est = PV4, gen = TH0),
+              bPV5 = bias(est = PV5, gen = TH0),
+              bPV6 = bias(est = PV6, gen = TH0),
+              bPV7 = bias(est = PV7, gen = TH0),
+              bPV8 = bias(est = PV8, gen = TH0),
+              bPV9 = bias(est = PV9, gen = TH0),
+              bPV10 = bias(est = PV10, gen = TH0),
+              rPV1 = sqrt(mean(bPV1^2)),
+              rPV2 = sqrt(mean(bPV2^2)),
+              rPV3 = sqrt(mean(bPV3^2)),
+              rPV4 = sqrt(mean(bPV4^2)),
+              rPV5 = sqrt(mean(bPV5^2)),
+              rPV6 = sqrt(mean(bPV6^2)),
+              rPV7 = sqrt(mean(bPV7^2)),
+              rPV8 = sqrt(mean(bPV8^2)),
+              rPV9 = sqrt(mean(bPV9^2)),
+              rPV10 = sqrt(mean(bPV10^2)))
+  
+  data3$bias = rowMeans(data3[2:11])
+  data3$rmse = rowMeans(data3[12:21])
+  
+  final_data = data.frame(rep = ii, 
+                        Country = data2$DIFcntry,
+                        condition = dd,
+                        DIFmag = mm,
+                        DIFper = pp,
+                        DIFloc = ll, 
+                        DIFcntry = cntry, 
+                        Prob = rp,
+                        N = 4000,
+                        data2[2:12], 
+                        bias = data3$bias, 
+                        rmse = data3$rmse)
+  
+  saveObject(final_data, file = paste0(path1, "PV/pv_c", dd, "_mm", mm, "_pp", pp,
+                              "_ll", ll, "_rp", rp, "_DIFcnt", cntry,"_r", ii, ".Rbin"))
+  saveObject(data1, file = paste0(path1, "all_data/all_data_c", dd, "_mm", mm, "_pp", pp,
+                              "_ll", ll, "_rp", rp, "_DIFcnt", cntry, "_r", ii, ".Rbin"))
+}
+
+
+
+#data_analysis(ii = 4, dd = 86, cntry = "med")
+
+
+```
+
+# Paralelizing
+
+```{r}
+library("parallel")
+library("doParallel")
+```
+
+
+```{r}
+Nsim = 100
+# Set parallel 
+no_cores <- detectCores()        #number of cores that will be used
+cl <- makeCluster(no_cores-4)    #creates copies of R to run on cores (i.e., computational clusters)
+registerDoParallel(cl)           #register parallel backend 
+
+
+clusterExport(cl,list('DIF_conditions', 'data_analysis',
+                      'itembank', 'items', 'bias',
+                      '%>%', 'melt', 'group_by', 
+                      'path', 'path1', 'path2',
+                      'saveObject', 'loadObject', 'Nsim',
+                      'add_column', 'summarise', 'mutate', 'rowMeans'), 
+              envir=environment())
+
+#parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 1, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 2, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 3, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 4, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 5, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 6, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 7, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 8, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 9, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 10, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 11, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 12, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 13, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 14, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 15, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 16, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 17, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 18, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 19, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 20, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 21, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 22, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 23, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 24, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 25, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 26, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 27, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 28, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 29, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 30, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 31, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 32, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 33, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 34, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 35, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 36, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 37, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 38, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 39, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 40, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 41, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 42, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 43, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 44, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 45, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 46, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 47, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 48, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 49, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 50, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 51, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 52, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 53, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 54, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 55, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 56, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 57, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 58, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 59, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 60, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 61, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 62, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 63, cntry = "high"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 64, cntry = "high"))
+parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 65, cntry = "high"))
+parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 66, cntry = "high"))
+parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 67, cntry = "high"))
+parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 68, cntry = "high"))
+parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 69, cntry = "high"))
+parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 70, cntry = "high"))
+parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 71, cntry = "high"))
+parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 72, cntry = "high"))
+parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 73, cntry = "high"))
+parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 74, cntry = "high"))
+parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 75, cntry = "high"))
+parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 76, cntry = "high"))
+parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 77, cntry = "high"))
+parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 78, cntry = "high"))
+parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 79, cntry = "high"))
+parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 80, cntry = "high"))
+parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 81, cntry = "high"))
+parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 82, cntry = "high"))
+parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 83, cntry = "high"))
+parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 84, cntry = "high"))
+parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 85, cntry = "high"))
+parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 86, cntry = "high"))
+parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 87, cntry = "high"))
+parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 88, cntry = "high"))
+parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 89, cntry = "high"))
+parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, dd = 90, cntry = "high"))
+# stop the core division
+stopCluster(cl)
+
+```
+
+## Data analysis of classification 
+
+
+```{r}
+
+path = "C:/Users/Montse/OneDrive - Indiana University/Dissertation/Data Analysis/Paper 1/Results/Generated responses/"
+path1 = "C:/Users/Montse/OneDrive - Indiana University/Dissertation/Data Analysis/Paper 1/Results/Optimal modules/"
+path2 = "C:/Users/Montse/OneDrive - Indiana University/Dissertation/Data Analysis/Paper 1/Results/Optmod/"
+path3 = "C:/Users/Montse/OneDrive - Indiana University/Dissertation/Data Analysis/Paper 1/Results/Optmod vf11/"
+
+read_data = function(condition, replication){
+  setwd(path)
+
+  files <- dir(pattern = paste0("*c", condition, "_N"))
+  files1 = grep(paste0("*r", replication, ".Rbin"), files, value = TRUE)
+  
+  data <- files1 %>%
+    map(loadObject) %>%
+    reduce(rbind)
+  
+  return(data)
+}
+
+data_analysis = function(ii){
+  for (dd in 1:90) {
+    
+  
+  # select from DIF conditions 
+  mm = DIF_conditions[[dd]][[1]] # DIF magnitude
+  pp = DIF_conditions[[dd]][[2]] # DIF percentage
+  ll = DIF_conditions[[dd]][[3]] # DIF location
+  rp = DIF_conditions[[dd]][[4]] # routing probability
+  
+  # DIF  
+  DIF = read_data(dd, ii)
+  
+  DIF1 = DIF %>%
+    mutate(Path = case_when(MOD2 == 3 & MOD3 == 6 ~ 1,
+                            MOD2 == 3 & MOD3 == 5 ~ 2,
+                            MOD2 == 2 & MOD3 == 5 ~ 3,
+                            MOD2 == 2 & MOD3 == 4 ~ 4,
+                            MOD2 == 3 & MOD3 == 4 ~ 5,
+                            MOD2 == 2 & MOD3 == 6 ~ 6))
+           
+  #Baseline conditions 
+  if (ll == "Core" & rp == 1){dd1 = 1
+    } else if (ll ==  "Stage 1" & rp == 1){dd1 = 2
+    } else if (ll ==  "Stage 2" & rp == 1){dd1 = 3
+    } else if (ll == "Core" & rp == .7){dd1 = 4
+    } else if (ll == "Stage 1" & rp == .7){dd1 = 5
+    } else if (ll == "Stage 2" & rp == .7){dd1 = 6
+    } else if (ll == "Core" & rp == .5){dd1 = 7
+    } else if (ll == "Stage 1" & rp == .5){dd1 = 8
+    } else if (ll == "Stage 2" & rp == .5){dd1 = 9
+    } 
+
+  NoDIF = read_data(dd1, ii)
+  NoDIF1 = NoDIF %>%
+    mutate(Path = case_when(MOD2 == 3 & MOD3 == 6 ~ 1,
+                            MOD2 == 3 & MOD3 == 5 ~ 2,
+                            MOD2 == 2 & MOD3 == 5 ~ 3,
+                            MOD2 == 2 & MOD3 == 4 ~ 4,
+                            MOD2 == 3 & MOD3 == 4 ~ 5,
+                            MOD2 == 2 & MOD3 == 6 ~ 6))
+  
+  #Join data
+  dat = inner_join(NoDIF1[,c(1:9, 82:87)], DIF1[,c(1:9, 82:87)], 
+                   by = c("Prob", "DIFcntry", "TH0"))
+  
+  optimal = dat %>%
+    mutate(OPT1 = ifelse(OP1.x == OP1.y, 1, 0),
+           OPT2 = ifelse(OP2.x == OP2.y, 1, 0),
+           CST1 = ifelse(MOD2.x == MOD2.y, 1, 0),
+           CST2 = ifelse(MOD3.x == MOD3.y, 1, 0),
+           OPT1_t = ifelse(OP1.y == TRUE & OP1.x == OP1.y, 1, 0),
+           OPT2_t = ifelse(OP2.y == TRUE & OP2.x == OP2.y, 1, 0),
+           CST1_t = ifelse(OP1.y == TRUE & MOD2.x == MOD2.y, 1, 0),
+           CST2_t = ifelse(OP2.y == TRUE & MOD3.x == MOD3.y, 1, 0),
+           CS1_CS2 = ifelse(MOD2.x == MOD2.y & MOD3.x == MOD3.y, 1, 0),
+           CS1_MS2 = ifelse(MOD2.x == MOD2.y & MOD3.x != MOD3.y, 1, 0),
+           MS1_CS2 = ifelse(MOD2.x != MOD2.y & MOD3.x == MOD3.y, 1, 0),
+           MS1_MS2 = ifelse(MOD2.x != MOD2.y & MOD3.x != MOD3.y, 1, 0),
+           CPath = ifelse(Path.x ==  Path.y, 1, 0),
+           M5Path  = ifelse(Path.x %in% c(1:4) & Path.y == 5, 1, 0),
+           M6Path  = ifelse(Path.x %in% c(1:4) & Path.y == 6, 1, 0) )
+             
+  
+  
+  # For optimal 
+  optimal1 = optimal %>%
+    group_by(Prob, DIFcntry) %>%
+    summarise(OPT1 = mean(OPT1),
+              OPT2 = mean(OPT2),
+              CST1 = mean(CST1),
+              CST2 = mean(CST2),
+              OPT1_t = mean(OPT1_t),
+              OPT2_t = mean(OPT2_t),
+              CST1_t = mean(CST1_t),
+              CST2_t = mean(CST2_t),
+              CS1_CS2 = mean(CS1_CS2),
+              CS1_MS2 = mean(CS1_MS2), 
+              MS1_CS2 = mean(MS1_CS2),
+              MS1_MS2 = mean(MS1_MS2),
+              CPath = mean(CPath),
+              M5Path = mean(M5Path),
+              M6Path = mean(M6Path))
+  
+  
+  # results
+  data1 = data.frame(rep = ii, 
+                     condition = dd, 
+                     DIFmag = mm,
+                     DIFper = pp, 
+                     DIFloc = ll,
+                     optimal1 )
+  
+ 
+  # saving
+  saveObject(data1, file = paste0(path3, "Optmod_true_c", dd, "_r", ii, ".Rbin"))
+ # saveObject(data2, file = paste0(path2, "Opt_c", dd, "_DIF", cntry, "_r", ii, ".Rbin"))
+  }
+}
+
+#mu = loadObject(paste0(path1, "Optmod_c", dd,  "_r", ii, ".Rbin"))
+```
+
+```{r}
+library("parallel")
+library("doParallel")
+```
+
+```{r}
+Nsim = 100
+# Set parallel 
+no_cores <- detectCores()        #number of cores that will be used
+cl <- makeCluster(no_cores-4)    #creates copies of R to run on cores (i.e., computational clusters)
+registerDoParallel(cl)           #register parallel backend 
+
+
+clusterExport(cl,list('DIF_conditions', 'data_analysis', 'read_data',
+                      '%>%', 'melt', 'group_by', 'reduce', 'map',
+                      'path', 'path1', 'path3', 
+                      'saveObject', 'loadObject', 'Nsim', 'case_when', 'inner_join',
+                      'add_column', 'summarise', 'mutate', 'rowMeans'), 
+              envir=environment())
+
+parSapply(cl, 1:Nsim, function(ii) data_analysis(ii))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, "med"))
+# parSapply(cl, 1:Nsim, function(ii) data_analysis(ii, "low"))
+
+```
+
+

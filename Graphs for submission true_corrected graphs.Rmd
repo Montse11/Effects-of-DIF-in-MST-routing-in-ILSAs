@@ -1,0 +1,1427 @@
+---
+title: "Graphs for submission"
+author: "Montserrat Valdivia"
+date: "11/3/2021"
+output: pdf_document
+---
+
+```{r, include=FALSE}
+rm(list=ls())
+#load libraries
+library("tidyverse")
+library("R.utils")
+library(jtools)
+library(extrafont)
+library(gridExtra)
+library(ggpubr)
+
+# #call in directory
+# setwd("C:/Users/Montse/OneDrive - Indiana University/Dissertation/Data Analysis/Paper 1/Results/PV/")
+# # call in data
+# 
+# files <- dir(pattern = "*.Rbin")
+# 
+# all_mst <- files %>%
+#   map(loadObject) %>%
+#   reduce(rbind)
+# 
+# 
+# saveObject(all_mst, file = "C:/Users/Montse/OneDrive - Indiana University/Dissertation/Data Analysis/Paper 1/Results/Results PV.Rbin")
+
+all_mst = loadObject("I:/Dissertation/Data Analysis/Paper 1/Results/Results PV.Rbin")
+
+all_mst$PVm = rowMeans(all_mst[11:20])
+all_mst$biaspv = all_mst$PVm - all_mst$TH0
+all_mst$biaspv2 = (all_mst$biaspv)^2
+
+all_mst_b = all_mst%>%
+    group_by(DIFcntry, DIFmag, DIFper, DIFloc, Prob) %>%
+    summarise(TH0m = mean(TH0),
+              PVm = mean(PVm),
+              bias = mean(bias),
+              abias = abs(bias),
+              rmse = sqrt(sum(bias^2)/9))
+
+```
+
+# Clean data
+
+```{r}
+all_mst1 = all_mst_b %>%
+   mutate(
+         DIFmag = case_when(DIFmag == 0 ~ "No DIF", DIFmag == 0.3 ~ "S", 
+                            DIFmag == 0.6 ~ "M", DIFmag == 1.4 ~ "L"),
+         DIFper = round(DIFper, 2),
+         DIFper = case_when(DIFper == 0 ~ "No DIF", DIFper == 0.08 ~ "8%", 
+                            DIFper == 0.25 ~ "25%", DIFper == 0.42 ~ "42%" ),
+         DIFcntry = case_when(DIFcntry == "high" ~ "High", DIFcntry == "med" ~ "Medium",
+                              DIFcntry == "low" ~ "Low"),
+         Prob = case_when(Prob == 0.5 ~ "Random", Prob == 0.7 ~ "M+PM", Prob == 1 ~ "Merit" ),
+         DIFloc = case_when(DIFmag != "No DIF" & DIFper != "No DIF"  ~ DIFloc,
+                            DIFmag == "No DIF" & DIFper == "No DIF" ~ "No DIF")) %>%
+       #DIFcntry = case_when(DIFmag != "No DIF" & DIFper != "No DIF" ~ DIFcntry,
+      #                    DIFmag == "No DIF" & DIFper == "No DIF"  ~ "No DIF"))
+     
+  mutate(DIFmag = factor(DIFmag, levels = c("No DIF", "S", "M", "L")),
+         DIFper = factor(DIFper, levels = c("No DIF", "8%", "25%", "42%")),
+         DIFcntry = factor(DIFcntry, levels = c("Low", "Medium", "High")),
+         DIFloc = factor(DIFloc, levels = c("No DIF", "Core", "Stage 1", "Stage 2")),
+         Prob = factor(Prob, levels = c("Merit", "M+PM", "Random")),
+         #Country = factor(Country, levels = c("Low 1", "Low 2", "Low 3", "Medium 1", 
+          #                                    "Medium 2", "Medium 3", "High 1", "High 2", "High 3" ))
+         )
+
+all_mst_M = all_mst1 %>%
+  group_by(DIFmag, DIFper, DIFloc, DIFcntry, Prob) %>%
+  summarise(bias_m = mean(bias),
+            rmse_m = mean(rmse),
+            abias_m = mean(abias))
+
+```
+
+
+# Make Graphs Jan 2023
+
+## Bias
+```{r}
+# Low performers
+ggplot(data = all_mst1, 
+       mapping=aes(x=`DIFmag`, y=bias, shape = Prob, 
+                  # shape = `Country`
+                  ))+
+ # geom_boxplot()+
+  geom_hline(yintercept = c(round(all_mst_M$bias_m, 2)[1:3]), linetype = "dotdash", color = "grey")+
+  geom_hline(aes(yintercept = 0), linetype = "dashed", color ="grey" )+ 
+  stat_summary(fun.y=mean,  size=.5, position = position_dodge(0.75)) +
+  #stat_summary(fun.y=mean,  shape=5, size=.5, position = position_dodge(0.75)) +
+  facet_grid( DIFcntry ~ DIFper + DIFloc , scales = "free_x")+
+  labs( x = "DIF Magnitude" , y= "Proficiency Bias")+
+  
+  
+  #scale_shape_manual(values=c(0, 1, 2, 5,9,10))+
+  
+  ylim(-.5, .5)+
+  #scale_colour_discrete(name="Routing Probability",  direction=1)+
+  #scale_color_grey(name="Routing Probability")+
+
+  scale_shape_discrete(name="Routing Probability")+
+  scale_linetype_manual(scale_name="", values=1)+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))
+  ggsave(filename = paste0("C:/Users/Montse/OneDrive - Indiana University/Dissertation/Data Analysis/Paper 1/Graphs/",
+                     "Proficiency Bias v2.tiff"), device = "tiff",
+  width = 35, height = 20, units = "cm", dpi = 600, compression = "lzw+p")
+
+
+
+```
+
+## Absolute bias
+```{r}
+# Low performers
+ggplot(data = all_mst1, 
+       mapping=aes(x=`DIFmag`, y=abias, shape = Prob, 
+                  # shape = `Country`
+                  ))+
+ # geom_boxplot()+
+  geom_hline(yintercept = c(round(all_mst_M$abias_m, 2)[1:3]), linetype = "dotdash", color = "grey")+
+  geom_hline(aes(yintercept = 0), linetype = "dashed", color ="grey" )+ 
+  stat_summary(fun.y=mean,  size=.5, position = position_dodge(0.75)) +
+  #stat_summary(fun.y=mean,  shape=5, size=.5, position = position_dodge(0.75)) +
+  facet_grid( DIFcntry ~ DIFper + DIFloc , scales = "free_x")+
+  labs( x = "DIF Magnitude" , y= "Proficiency Bias")+
+  
+  
+  #scale_shape_manual(values=c(0, 1, 2, 5,9,10))+
+  
+  ylim(0, .5)+
+  #scale_colour_discrete(name="Routing Probability",  direction=1)+
+  #scale_color_grey(name="Routing Probability")+
+
+  scale_shape_discrete(name="Routing Probability")+
+  scale_linetype_manual(scale_name="", values=1)+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))
+  ggsave(filename = paste0("C:/Users/Montse/OneDrive - Indiana University/Dissertation/Data Analysis/Paper 1/Graphs/",
+                     "Proficiency Absolute Bias v2.tiff"), device = "tiff",
+  width = 35, height = 20, units = "cm", dpi = 600, compression = "lzw+p")
+
+
+
+```
+
+## RMSE
+
+```{r}
+# Low performers
+ggplot(data = all_mst1, 
+       mapping=aes(x=`DIFmag`, y=rmse, shape = Prob, 
+                  # shape = `Country`
+                  ))+
+ # geom_boxplot()+
+  geom_hline(yintercept = c(round(all_mst_M$rmse_m, 3)[1:3]), linetype = "dotdash", color = "grey")+
+  stat_summary(fun.y=mean,  size=.5, position = position_dodge(0.75)) +
+  #stat_summary(fun.y=mean,  shape=5, size=.5, position = position_dodge(0.75)) +
+  facet_grid( DIFcntry ~ DIFper + DIFloc , scales = "free_x")+
+  labs( x = "DIF Magnitude" , y= "Proficiency RMSE")+
+  
+ # geom_hline(aes(yintercept = PV_Bias, colour = `mstpath`))+
+  #geom_hline(aes(yintercept = 0), linetype = "dashed", color ="grey" )+
+  #scale_shape_manual(values=c(0, 1, 2, 5,9,10))+
+  
+  ylim(0, .25)+
+  #scale_colour_discrete(name="Routing Probability",  direction=1)+
+  #scale_color_grey(name="Routing Probability")+
+
+  scale_shape_discrete(name="Routing Probability")+
+  scale_linetype_manual(scale_name="", values=1)+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))
+  ggsave(filename = paste0("C:/Users/Montse/OneDrive - Indiana University/Dissertation/Data Analysis/Paper 1/Graphs/",
+                     "Proficiency RMSE v3.tiff"), device = "tiff",
+  width = 35, height = 20, units = "cm", dpi = 600, compression = "lzw+p")
+
+
+
+```
+
+```{r}
+# Low performers
+ggplot(data = all_mst1, 
+       mapping=aes(x=`DIFmag`, y=rmse, color = Prob, 
+                  # shape = `Country`
+                  ))+
+  geom_boxplot()+
+  #stat_summary(fun.y=mean,  size=.5, position = position_dodge(0.75)) +
+  stat_summary(fun.y=mean,  shape=5, size=.5, position = position_dodge(0.75)) +
+  facet_grid( DIFcntry ~ DIFper + DIFloc , scales = "free_x")+
+  labs( x = "DIF Magnitude" , y= "Proficiency Bias")+
+  
+ # geom_hline(aes(yintercept = PV_Bias, colour = `mstpath`))+
+  #geom_hline(aes(yintercept = 0), linetype = "dashed", color ="grey" )+
+  #scale_shape_manual(values=c(0, 1, 2, 5,9,10))+
+  
+  ylim(0, .8)+
+  scale_colour_discrete(name="Routing Probability",  direction=1)+
+  scale_color_grey(name="Routing Probability")+
+
+  scale_shape_discrete(name="Routing Probability")+
+  scale_linetype_manual(scale_name="", values=1)+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))
+  ggsave(filename = paste0("C:/Users/Montse/OneDrive - Indiana University/Dissertation/Data Analysis/Paper 1/Graphs/",
+                     "Proficiency RMSE_boxplot.tiff"), device = "tiff",
+  width = 35, height = 20, units = "cm", dpi = 600, compression = "lzw+p")
+
+
+
+```
+
+
+# Jan Optimal Routing
+
+```{r, include=FALSE}
+rm(list=ls())
+#load libraries
+library("tidyverse")
+library("R.utils")
+library(dplyr)
+library(jtools)
+library(extrafont)
+library(gridExtra)
+library(ggpubr)
+
+#call in directory
+setwd("I:/Dissertation/Data Analysis/Paper 1/Results/Optmod vf11/")
+# call in data
+
+files <- dir(pattern = "*Optmod_true")
+
+all_mst <- files %>%
+  map(loadObject) %>%
+  reduce(rbind)
+
+saveObject(all_mst, file = "C:/Users/Montse/OneDrive - Indiana University/Dissertation/Data Analysis/Paper 1/Results/accuracy results true.Rbin")
+
+all_mst = loadObject("I:/Dissertation/Data Analysis/Paper 1/Results/accuracy results true.Rbin")
+
+```
+
+# Clean data
+
+```{r}
+all_mst1 = all_mst %>%
+  mutate(
+    # Country1 = case_when( Country == 1 ~ "High", Country == 2 ~ "High",
+    #                           Country == 3 ~ "High", Country == 4 ~ "Medium",
+    #                           Country == 5 ~ "Medium", Country == 6 ~ "Medium",
+    #                           Country == 7 ~ "Low", Country == 8 ~ "Low", Country == 9 ~ "Low"),
+    # Country = case_when( Country == 1 ~ "High 1", Country == 2 ~ "High 2",
+    #                           Country == 3 ~ "High 3", Country == 4 ~ "Medium 1",
+    #                           Country == 5 ~ "Medium 2", Country == 6 ~ "Medium 3",
+    #                           Country == 7 ~ "Low 1", Country == 8 ~ "Low 2", Country == 9 ~ "Low 3"),
+         DIFmag = case_when(DIFmag == 0 ~ "No DIF", DIFmag == 0.3 ~ "S", 
+                            DIFmag == 0.6 ~ "M", DIFmag == 1.4 ~ "L"),
+         DIFper = round(DIFper, 2),
+         DIFper = case_when(DIFper == 0 ~ "No DIF", DIFper == 0.08 ~ "8%", 
+                            DIFper == 0.25 ~ "25%", DIFper == 0.42 ~ "42%" ),
+         DIFcntry = case_when(DIFcntry == "high" ~ "High", DIFcntry == "med" ~ "Medium",
+                              DIFcntry == "low" ~ "Low"),
+         Prob = case_when(Prob == 0.5 ~ "Random", Prob == 0.7 ~ "M+PM", Prob == 1 ~ "Merit" ))%>%
+       # mutate_at(DIFloc = case_when(DIFmag != "No DIF" & DIFper != "No DIF"  ~ DIFloc,
+        #                   DIFmag == "No DIF" & DIFper == "No DIF" ~ "No DIF")) %>%
+       #DIFcntry = case_when(DIFmag != "No DIF" & DIFper != "No DIF" ~ DIFcntry,
+      #                    DIFmag == "No DIF" & DIFper == "No DIF"  ~ "No DIF"))
+     
+  mutate(DIFmag = factor(DIFmag, levels = c("No DIF", "S", "M", "L")),
+         DIFper = factor(DIFper, levels = c("No DIF", "8%", "25%", "42%")),
+         DIFcntry = factor(DIFcntry, levels = c("Low", "Medium", "High")),
+         DIFloc = factor(DIFloc, levels = c("No DIF", "Core", "Stage 1", "Stage 2")),
+         Prob = factor(Prob, levels = c("Merit", "M+PM", "Random")))# %>%
+  #filter(DIFcntry == Country1)
+         # Country = factor(Country, levels = c("Low 1", "Low 2", "Low 3", "Medium 1", 
+         #                                      "Medium 2", "Medium 3", "High 1", "High 2", "High 3" )))
+'%!in%' <- function(x,y)!('%in%'(x,y))
+
+all_mst_M = all_mst1 %>%
+  group_by(DIFmag, DIFper, DIFloc, DIFcntry, Prob) %>%
+  summarise(OPT1_m = mean(OPT1),
+            OPT2_m = mean(OPT2),
+            CST1_m = mean(CST1),
+            CST2_m = mean(CST2),
+            CS1_CS2_m = mean(CS1_CS2),
+            CS1_MS2_m = mean(CS1_MS2),
+            MS1_CS2_m = mean(MS1_CS2),
+            MS1_MS2_m = mean(MS1_MS2),
+            CPath_m = mean(CPath),
+            M5Path_m = mean(M5Path),
+            M6Path_m = mean(M5Path))
+
+all_mst_melt = reshape2::melt(all_mst1[,c(1:8,13:16)], 
+               id = c("rep", "condition","DIFmag", "DIFper", "DIFloc", "DIFcntry", "Prob", "Country"))
+
+
+all_mst_M1 = all_mst_melt %>%
+  group_by(DIFmag, DIFper, DIFloc, Country, Prob, variable) %>%
+  summarise(value = mean(value))
+```
+```{r}
+all_mst1 = all_mst %>%
+  mutate(DIFcntry = case_when( DIFcntry == 1 ~ "High", DIFcntry == 2 ~ "High", 
+                              DIFcntry == 3 ~ "High", DIFcntry == 4 ~ "Medium",
+                              DIFcntry == 5 ~ "Medium", DIFcntry == 6 ~ "Medium",
+                              DIFcntry == 7 ~ "Low", DIFcntry == 8 ~ "Low", DIFcntry == 9 ~ "Low"),
+         DIFmag = case_when(DIFmag == 0 ~ "No DIF", DIFmag == 0.3 ~ "S", 
+                            DIFmag == 0.6 ~ "M", DIFmag == 1.4 ~ "L"),
+         DIFper = round(DIFper, 2),
+         DIFper = case_when(DIFper == 0 ~ "No DIF", DIFper == 0.08 ~ "8%", 
+                            DIFper == 0.25 ~ "25%", DIFper == 0.42 ~ "42%" ),
+         Prob = case_when(Prob == 0.5 ~ "Random", Prob == 0.7 ~ "M+PM", Prob == 1 ~ "Merit" )) %>%
+       #DIFcntry = case_when(DIFmag != "No DIF" & DIFper != "No DIF" ~ DIFcntry,
+      #                    DIFmag == "No DIF" & DIFper == "No DIF"  ~ "No DIF"))
+     
+  mutate(DIFmag = factor(DIFmag, levels = c("No DIF", "S", "M", "L")),
+         DIFper = factor(DIFper, levels = c("No DIF", "8%", "25%", "42%")),
+         DIFcntry = factor(DIFcntry, levels = c("Low", "Medium", "High")),
+         DIFloc = factor(DIFloc, levels = c("No DIF", "Core", "Stage 1", "Stage 2")),
+         Prob = factor(Prob, levels = c("Merit", "M+PM", "Random"))      )
+
+all_mst_M = all_mst1 %>%
+  group_by(DIFmag, DIFper, DIFloc, DIFcntry, Prob) %>%
+  summarise(OPT1_m = mean(OPT1_t),
+            OPT2_m = mean(OPT2_t),
+            CST1_m = mean(CST1_t),
+            CST2_m = mean(CST2_t),
+            CS1_CS2_m = mean(CS1_CS2),
+            CS1_MS2_m = mean(CS1_MS2),
+            MS1_CS2_m = mean(MS1_CS2),
+            MS1_MS2_m = mean(MS1_MS2),
+            CPath_m = mean(CPath),
+            M5Path_m = mean(M5Path),
+            M6Path_m = mean(M6Path))
+all_mst_M$MPath = all_mst_M$M5Path_m + all_mst_M$M6Path_m
+            
+```
+
+
+```{r}
+a = all_mst_M %>%
+  mutate(DIFmag = case_when(DIFmag == "No DIF" ~ "DIF", DIFmag == "S" ~ "S", 
+                            DIFmag == "M" ~ "M", DIFmag == "L" ~ "L"),
+         DIFper = case_when(DIFper == "No DIF" ~ "No", DIFper == "8%"  ~ "8%", 
+                            DIFper == "25%" ~ "25%", DIFper == "42%" ~ "42%" ),)%>%
+  mutate(DIFmag = factor(DIFmag, levels = c("DIF", "S", "M", "L")),
+         DIFper = factor(DIFper, levels = c("No", "8%", "25%", "42%"))) %>%
+  filter(DIFloc == "Core") %>%
+  ggplot(mapping=aes(x= Prob, y=CST1_m, shape = DIFcntry))+
+#  geom_boxplot()+
+ # stat_summary(fun.y=mean,  size=.5, position = position_dodge(0.75)) +
+  geom_point( size = 2)+
+ # scale_shape_manual(values=c(0, 1, 2))+
+  facet_grid(  ~ DIFper + DIFmag , scales = "free_x")+
+  ylim(0, 1)+
+  labs(x =" ", y = " ")+
+  scale_shape_manual(values=c(0, 1, 2))+
+  guides(shape = "none")+
+  ggtitle("DIF in Core - Core to Stage 1")+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  theme(axis.text.x = element_text(angle = 70, vjust = 0.5, hjust=.3),
+        strip.text.x = element_text(size = 12 ))
+
+
+b = all_mst_M %>%
+  filter(DIFmag != "No DIF" & DIFloc == "Core") %>%
+  ggplot(mapping=aes(x= Prob, y=CST2_m, shape = DIFcntry))+
+#  geom_boxplot()+
+ # stat_summary(fun.y=mean,  size=.5, position = position_dodge(0.75)) +
+  geom_point( size = 2)+
+  facet_grid(  ~ DIFper + DIFmag , scales = "free_x")+
+  ylim(0, 1)+
+  labs(x =" ", y = " ")+
+  scale_linetype_manual(scale_name="", values=1)+
+  scale_shape_manual(values=c(0, 1, 2))+
+  guides(shape = "none")+
+  ggtitle("DIF in Core - Stage 1 to Stage 2")+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  theme(axis.text.x = element_text(angle = 70, vjust = 0.5, hjust=.3),
+        strip.text.x = element_text(size = 12 ))
+
+c = all_mst_M %>%
+  filter(DIFmag != "No DIF" & DIFloc == "Stage 1") %>%
+  ggplot(mapping=aes(x= Prob, y=CST2_m, shape = DIFcntry))+
+#  geom_boxplot()+
+ # stat_summary(fun.y=mean,  size=.5, position = position_dodge(0.75)) +
+  geom_point( size = 2)+
+  scale_shape_manual(values=c(0, 1, 2))+
+  #guides(shape = "none")+
+  facet_grid(  ~ DIFper + DIFmag , scales = "free_x")+
+  ylim(0, 1)+
+  labs(x =" ", y = " ", shape = "DIF Country")+
+  scale_linetype_manual(scale_name="", values=1)+
+  ggtitle("DIF in Stage 1 - Stage 1 to Stage 2")+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  theme(axis.text.x = element_text(angle = 70, vjust = 0.5, hjust=.3),
+        strip.text.x = element_text(size = 12 ))
+
+d = ggarrange(a,b,c, nrow = 1, ncol = 3, common.legend = TRUE, legend="bottom")
+annotate_figure(d, bottom = text_grob("Routing Probability"), left = text_grob("Proportion of Optimal Routing \n (No DIF = DIF in Module", rot = 90))
+
+ggsave(filename = paste0("I:/Dissertation/Data Analysis/Paper 1/Graphs corrected/",
+                         "Figure 1.tiff"), device = "tiff",  width = 35, height = 20, units = "cm", dpi = 600, compression = "lzw+p")
+
+
+```
+```{r}
+i = all_mst_M %>%
+  filter(DIFloc == "Core") %>%
+  ggplot(mapping=aes(x= Prob, y=CPath_m, shape = DIFcntry))+
+#  geom_boxplot()+
+ # stat_summary(fun.y=mean,  size=.5, position = position_dodge(0.75)) +
+  geom_point( size = 2)+
+ # scale_shape_manual(values=c(0, 1, 2))+
+  facet_grid(  ~ DIFper + DIFmag , scales = "free_x")+
+  ylim(0, 1)+
+  labs(x =" ", y = " ")+
+  scale_shape_manual(values=c(0, 1, 2))+
+  guides(shape = "none")+
+  ggtitle("DIF in Core - Correct Path Core-High-Low")+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  theme(axis.text.x = element_text(angle = 70, vjust = 0.5, hjust=.3))
+
+j = all_mst_M %>%
+  filter(DIFloc == "Stage 1") %>%
+  ggplot(mapping=aes(x= Prob, y=CPath_m, shape = DIFcntry))+
+#  geom_boxplot()+
+ # stat_summary(fun.y=mean,  size=.5, position = position_dodge(0.75)) +
+  geom_point( size = 2)+
+ # scale_shape_manual(values=c(0, 1, 2))+
+  facet_grid(  ~ DIFper + DIFmag , scales = "free_x")+
+  ylim(0, 1)+
+  labs(x =" ", y = " ")+
+  scale_shape_manual(values=c(0, 1, 2))+
+  guides(shape = "none")+
+  ggtitle("DIF in Stage 1 - Correct Path Core-High-Low")+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  theme(axis.text.x = element_text(angle = 70, vjust = 0.5, hjust=.3))
+e = all_mst_M %>%
+  filter(DIFloc == "Core") %>%
+  ggplot(mapping=aes(x= Prob, y=M5Path_m, shape = DIFcntry))+
+#  geom_boxplot()+
+ # stat_summary(fun.y=mean,  size=.5, position = position_dodge(0.75)) +
+  geom_point( size = 2)+
+ # scale_shape_manual(values=c(0, 1, 2))+
+  facet_grid(  ~ DIFper + DIFmag , scales = "free_x")+
+  ylim(0, .15)+
+  labs(x =" ", y = " ")+
+  scale_shape_manual(values=c(0, 1, 2))+
+  guides(shape = "none")+
+  ggtitle("DIF in Core - Incorrect Path Core-High-Low")+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  theme(axis.text.x = element_text(angle = 70, vjust = 0.5, hjust=.3))
+
+f = all_mst_M %>%
+  filter(DIFloc == "Stage 1") %>%
+  ggplot(mapping=aes(x= Prob, y=M5Path_m, shape = DIFcntry))+
+#  geom_boxplot()+
+ # stat_summary(fun.y=mean,  size=.5, position = position_dodge(0.75)) +
+  geom_point( size = 2)+
+ # scale_shape_manual(values=c(0, 1, 2))+
+  facet_grid(  ~ DIFper + DIFmag , scales = "free_x")+
+  ylim(0, .15)+
+  labs(x =" ", y = " ")+
+  scale_shape_manual(values=c(0, 1, 2))+
+  guides(shape = "none")+
+  ggtitle("DIF in Stage 1 - Incorrect Path Core-High-Low")+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  theme(axis.text.x = element_text(angle = 70, vjust = 0.5, hjust=.3))
+
+g = all_mst_M %>%
+  filter(DIFloc == "Core") %>%
+  ggplot(mapping=aes(x= Prob, y=M6Path_m, shape = DIFcntry))+
+#  geom_boxplot()+
+ # stat_summary(fun.y=mean,  size=.5, position = position_dodge(0.75)) +
+  geom_point( size = 2)+
+ # scale_shape_manual(values=c(0, 1, 2))+
+  facet_grid(  ~ DIFper + DIFmag , scales = "free_x")+
+  ylim(0, .15)+
+  labs(x =" ", y = " ")+
+  scale_shape_manual(values=c(0, 1, 2))+
+  guides(shape = "none")+
+  ggtitle("DIF in Core - Incorrect Path Core-Low-High")+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  theme(axis.text.x = element_text(angle = 70, vjust = 0.5, hjust=.3))
+
+h = all_mst_M %>%
+  filter(DIFloc == "Stage 1") %>%
+  ggplot(mapping=aes(x= Prob, y=M6Path_m, shape = DIFcntry))+
+#  geom_boxplot()+
+ # stat_summary(fun.y=mean,  size=.5, position = position_dodge(0.75)) +
+  geom_point( size = 2)+
+ # scale_shape_manual(values=c(0, 1, 2))+
+  facet_grid(  ~ DIFper + DIFmag , scales = "free_x")+
+  ylim(0, .15)+
+  labs(x =" ", y = " ")+
+  scale_shape_manual(values=c(0, 1, 2))+
+   labs(x =" ", y = " ", shape = "DIF Country")+
+  ggtitle("DIF in Stage 1 - Incorrect Path Core-Low-High")+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  theme(axis.text.x = element_text(angle = 70, vjust = 0.5, hjust=.3))
+
+d = ggarrange(e,g,f,h, nrow = 2, ncol = 2, common.legend = TRUE, legend="bottom")
+annotate_figure(d, bottom = text_grob("Routing Probability"), left = text_grob("Proportion of Non-optimal Routing \n (No DIF = DIF in Module", rot = 90))
+
+ggsave(filename = paste0("I:/Dissertation/Data Analysis/Paper 1/Graphs corrected/",
+                         "Figure 2.tiff"), device = "tiff",  width = 35, height = 20, units = "cm", dpi = 600, compression = "lzw+p")
+
+
+```
+
+## data analysis
+```{r}
+all_mst_M %>%
+  filter(DIFloc == "Core") %>%
+  ggplot(mapping=aes(x= Prob, y=CS1_CS2_m, shape = DIFcntry))+
+#  geom_boxplot()+
+ # stat_summary(fun.y=mean,  size=.5, position = position_dodge(0.75)) +
+  geom_point( size = 2)+
+ # scale_shape_manual(values=c(0, 1, 2))+
+  facet_grid(  ~ DIFper + DIFmag , scales = "free_x")+
+  #ylim(0, .15)+
+  labs(x =" ", y = " ")+
+  scale_shape_manual(values=c(0, 1, 2))+
+   labs(x =" ", y = " ", shape = "DIF Country")+
+  ggtitle("DIF in Core - Correct Path")+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  theme(axis.text.x = element_text(angle = 60, vjust = 0.5, hjust=.3))
+all_mst_M %>%
+  filter(DIFloc == "Stage 1") %>%
+  ggplot(mapping=aes(x= Prob, y=CS1_CS2_m, shape = DIFcntry))+
+#  geom_boxplot()+
+ # stat_summary(fun.y=mean,  size=.5, position = position_dodge(0.75)) +
+  geom_point( size = 2)+
+ # scale_shape_manual(values=c(0, 1, 2))+
+  facet_grid(  ~ DIFper + DIFmag , scales = "free_x")+
+  #ylim(0, .15)+
+  labs(x =" ", y = " ")+
+  scale_shape_manual(values=c(0, 1, 2))+
+   labs(x =" ", y = " ", shape = "DIF Country")+
+  ggtitle("DIF in Stage 1 - Correct Path")+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  theme(axis.text.x = element_text(angle = 60, vjust = 0.5, hjust=.3))
+
+
+```
+```{r}
+all_mst_M %>%
+  filter(DIFloc == "Core") %>%
+  ggplot(mapping=aes(x= Prob, y=CS1_MS2_m, shape = DIFcntry))+
+#  geom_boxplot()+
+ # stat_summary(fun.y=mean,  size=.5, position = position_dodge(0.75)) +
+  geom_point( size = 2)+
+ # scale_shape_manual(values=c(0, 1, 2))+
+  facet_grid(  ~ DIFper + DIFmag , scales = "free_x")+
+  #ylim(0, .15)+
+  labs(x =" ", y = " ")+
+  scale_shape_manual(values=c(0, 1, 2))+
+   labs(x =" ", y = " ", shape = "DIF Country")+
+  ggtitle("DIF in Core - Correct to Stage 1, Incorrect to Stage 2")+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  theme(axis.text.x = element_text(angle = 60, vjust = 0.5, hjust=.3))
+all_mst_M %>%
+  filter(DIFloc == "Stage 1") %>%
+  ggplot(mapping=aes(x= Prob, y=CS1_MS2_m, shape = DIFcntry))+
+#  geom_boxplot()+
+ # stat_summary(fun.y=mean,  size=.5, position = position_dodge(0.75)) +
+  geom_point( size = 2)+
+ # scale_shape_manual(values=c(0, 1, 2))+
+  facet_grid(  ~ DIFper + DIFmag , scales = "free_x")+
+  #ylim(0, .15)+
+  labs(x =" ", y = " ")+
+  scale_shape_manual(values=c(0, 1, 2))+
+   labs(x =" ", y = " ", shape = "DIF Country")+
+  ggtitle("DIF in Stage 1 - Correct to Stage 1, Incorrect to Stage 2")+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  theme(axis.text.x = element_text(angle = 60, vjust = 0.5, hjust=.3))
+```
+
+
+```{r}
+all_mst_M %>%
+  filter(DIFloc == "Core") %>%
+  ggplot(mapping=aes(x= Prob, y=MS1_CS2_m, shape = DIFcntry))+
+#  geom_boxplot()+
+ # stat_summary(fun.y=mean,  size=.5, position = position_dodge(0.75)) +
+  geom_point( size = 2)+
+ # scale_shape_manual(values=c(0, 1, 2))+
+  facet_grid(  ~ DIFper + DIFmag , scales = "free_x")+
+  #ylim(0, .15)+
+  labs(x =" ", y = " ")+
+  scale_shape_manual(values=c(0, 1, 2))+
+   labs(x =" ", y = " ", shape = "DIF Country")+
+  ggtitle("DIF in Core - Incorrect to Stage 1, Correct to Stage 2")+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  theme(axis.text.x = element_text(angle = 60, vjust = 0.5, hjust=.3))
+all_mst_M %>%
+  filter(DIFloc == "Stage 1") %>%
+  ggplot(mapping=aes(x= Prob, y=MS1_CS2_m, shape = DIFcntry))+
+#  geom_boxplot()+
+ # stat_summary(fun.y=mean,  size=.5, position = position_dodge(0.75)) +
+  geom_point( size = 2)+
+ # scale_shape_manual(values=c(0, 1, 2))+
+  facet_grid(  ~ DIFper + DIFmag , scales = "free_x")+
+  #ylim(0, .15)+
+  labs(x =" ", y = " ")+
+  scale_shape_manual(values=c(0, 1, 2))+
+   labs(x =" ", y = " ", shape = "DIF Country")+
+  ggtitle("DIF in Stage 1 - Incorrect to Stage 1, Correct to Stage 2")+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  theme(axis.text.x = element_text(angle = 60, vjust = 0.5, hjust=.3))
+```
+
+```{r}
+all_mst_M %>%
+  filter(DIFloc == "Core") %>%
+  ggplot(mapping=aes(x= Prob, y=MS1_MS2_m, shape = DIFcntry))+
+#  geom_boxplot()+
+ # stat_summary(fun.y=mean,  size=.5, position = position_dodge(0.75)) +
+  geom_point( size = 2)+
+ # scale_shape_manual(values=c(0, 1, 2))+
+  facet_grid(  ~ DIFper + DIFmag , scales = "free_x")+
+  #ylim(0, .15)+
+  labs(x =" ", y = " ")+
+  scale_shape_manual(values=c(0, 1, 2))+
+   labs(x =" ", y = " ", shape = "DIF Country")+
+  ggtitle("DIF in Core - Incorrect to Stage 1, Incorrect to Stage 2")+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  theme(axis.text.x = element_text(angle = 60, vjust = 0.5, hjust=.3))
+all_mst_M %>%
+  filter(DIFloc == "Stage 1") %>%
+  ggplot(mapping=aes(x= Prob, y=MS1_MS2_m, shape = DIFcntry))+
+#  geom_boxplot()+
+ # stat_summary(fun.y=mean,  size=.5, position = position_dodge(0.75)) +
+  geom_point( size = 2)+
+ # scale_shape_manual(values=c(0, 1, 2))+
+  facet_grid(  ~ DIFper + DIFmag , scales = "free_x")+
+  #ylim(0, .15)+
+  labs(x =" ", y = " ")+
+  scale_shape_manual(values=c(0, 1, 2))+
+   labs(x =" ", y = " ", shape = "DIF Country")+
+  ggtitle("DIF in Stage 1 - Incorrect to Stage 1, Incorrect to Stage 2")+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  theme(axis.text.x = element_text(angle = 60, vjust = 0.5, hjust=.3))
+```
+
+
+# Analyzing the items
+
+```{r}
+rm(list = ls())
+
+#call in directory
+setwd("C:/Users/Montse/OneDrive - Indiana University/Dissertation/Data Analysis/Paper 1/Results/Items/")
+# call in data
+
+files <- dir(pattern = "*Rbin")
+
+
+all_mst <- files %>%
+  map(loadObject) %>%
+  reduce(rbind)
+```
+
+
+
+# STOP Anything beyond this point is for old submission.
+
+```{r}
+path = getwd()
+
+
+ggplot(data = all2gen_mst[which(all2gen_mst$Country_gen == "High"),], 
+       mapping=aes(x=`DIFmag`, y=PV_Bias, shape=`mstpath`, 
+                   size = N
+                  # shape = `Country`
+                  ))+
+  geom_point(alpha = 0.5)+
+  facet_grid(Prob ~ DIFper + DIFloc, scales = "free_x" )+
+  labs( x = "DIF Magnitude" , y= "Proficiency Bias \n High Performing Country",
+        shape = "MST adaptive path")+
+  
+  #geom_hline(aes(yintercept = PV_Bias, colour = `mstpath`))+
+  geom_hline(aes(yintercept = 0), linetype = "dashed", color ="grey" )+
+  scale_shape_manual(values=c(0, 1, 2, 5,9,10))+
+
+  ylim(-1, 1.06)+
+  #scale_colour_discrete(name="No DIF Routing\nProbability",  direction=1)+
+  scale_color_grey(name="MST adaptive path")+
+
+  scale_shape_discrete(name="MST adaptive path")+
+  scale_linetype_manual(scale_name="", values=1)+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  ggsave(filename = paste0("D:/DIF in MST Routing in ILSA/Graphs for submission/",
+                     "Proficiency Recovery_High Perf_Bias_c.tiff"), device = "tiff",
+  width = 35, height = 20, units = "cm", dpi = 600, compression = "lzw+p")
+
+
+ggplot(data = all2gen_mst, 
+       mapping=aes(x=`DIFmag`, y=PV_Bias, shape=`mstpath`, 
+                   size = N
+                  # shape = `Country`
+                  ))+
+  geom_point(alpha = 0.5)+
+  facet_grid(Prob ~ DIFper + DIFloc, scales = "free_x" )+
+  labs( x = "DIF Magnitude" , y= "Proficiency Bias \n High Performing Country",
+        shape = "MST adaptive path")+
+  
+  #geom_hline(aes(yintercept = PV_Bias, colour = `mstpath`))+
+  geom_hline(aes(yintercept = 0), linetype = "dashed", color ="grey" )+
+  scale_shape_manual(values=c(0, 1, 2, 5,9,10))+
+
+  ylim(-1, 1.06)+
+  #scale_colour_discrete(name="No DIF Routing\nProbability",  direction=1)+
+  scale_color_grey(name="MST adaptive path")+
+
+  scale_shape_discrete(name="MST adaptive path")+
+  scale_linetype_manual(scale_name="", values=1)+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  ggsave(filename = paste0("D:/DIF in MST Routing in ILSA/Graphs for submission/",
+                     "Proficiency Recovery_RMSE_c.tiff"), device = "tiff",
+  width = 35, height = 20, units = "cm", dpi = 600, compression = "lzw+p")
+
+
+```
+
+
+```{r}
+#Clean data
+## make them factors
+all_mst$DIFmag = as.factor(all_mst$DIFmag)
+all_mst$DIFper = as.factor(all_mst$DIFper)
+all_mst$Prob = as.factor(all_mst$Prob)
+#demark the order
+all_mst1 <- all_mst %>% 
+  mutate(Country = fct_relevel(Country, "SGP", "KOR", "TWN", "SWE", "MLT", "MYS", "MAR", "ZAF", "SAU"),
+         DIFmag = fct_relevel(DIFmag, "0.25", "0.5", "1", "NoDIF"),
+         DIFloc = fct_relevel(DIFloc, "Core", "Stage 1", "Stage 2", "NoDIF")) 
+#define the labels
+all_mst1$DIFper <- plyr::mapvalues(all_mst1$DIFper, from = c("11", "33", "56"), to = c("11%", "33%", "56%"))  
+all_mst1$DIFmag <- plyr::mapvalues(all_mst1$DIFmag, from = c("0.25","0.5", "1"), to = c("0.25","0.50", "1.00"))  
+#all_mst1$DIFloc <- plyr::mapvalues(all_mst1$DIFloc, from = c("core","Stg1", "stg2"), to = c("Core","Stage 1", "Stage 2"))  
+all_mst1$Prob <- plyr::mapvalues(all_mst1$Prob, from = c("0.5","0.7", "1"), to = c("Random","M+PM", "Merit"))  
+all_mst1$Country <- factor(all_mst1$Country, 
+                       levels = c("SGP", "KOR", "TWN", "SWE", "MLT", "MYS", "MAR", "ZAF", "SAU"),
+                       labels = c("High 1", "High 2", "High 3",
+                                  "Medium 1", "Medium 2", "Medium 3",
+                                  "Low 1", "Low 2", "Low 3"))
+all_mst1$Country_gen <- factor(all_mst1$Country, 
+                           levels = c("High 1", "High 2", "High 3",
+                                      "Medium 1", "Medium 2", "Medium 3",
+                                      "Low 1", "Low 2", "Low 3"),
+                           labels = c("High", "High", "High",
+                                      "Medium", "Medium", "Medium",
+                                      "Low", "Low", "Low"))
+
+
+
+all_mst1$mstpath = factor(all_mst1$mstpath, levels = c("Core-High-High", "Core-High-Med", "Core-Low-Low", "Core-Low-Med", "Core-High-Low", "Core-Low-High"))
+
+```
+
+```{r}
+all2gen_mst <- all_mst1%>%
+  group_by(Country_gen, mstpath, Prob, DIFmag, DIFloc, DIFper) %>%
+  dplyr::summarize(TH0 = mean(TH0),
+                  # Eth = mean(Eth),
+                   PV = mean(PV),
+                  # Esd = mean(Esd),
+                  # SE = mean(Ese),
+                  # Bias = mean(bias),
+                   PV_AbsBias = mean(abs.bias_pv),
+                   PV_Bias = mean(bias_pv),
+                   PV_AbsBias = mean(abs.bias_pv),
+                   Variance = mean(Mvar_PV),
+                   RMSE = mean(RMSE),
+                   N = mean(N)) 
+                   #PV_RMSE = mean(RMSE_pv))
+
+```
+
+# Proficiency Recovery
+
+### Bias for mst adaptive paths with Leslie's feedback
+
+```{r}
+# Low performers
+ggplot(data = all2gen_mst[which(all2gen_mst$Country_gen == "Low"),], 
+       mapping=aes(x=`DIFmag`, y=PV_Bias, shape=`mstpath`, 
+                   size = N
+                  # shape = `Country`
+                  ))+
+  geom_point(alpha = 0.5)+
+  facet_grid(Prob ~ DIFper + DIFloc , scales = "free_x")+
+  labs( x = "DIF Magnitude" , y= "Proficiency Bias \n Low Performing Country",
+        shape = "MST adaptive path")+
+  
+ # geom_hline(aes(yintercept = PV_Bias, colour = `mstpath`))+
+  geom_hline(aes(yintercept = 0), linetype = "dashed", color ="grey" )+
+  scale_shape_manual(values=c(0, 1, 2, 5,9,10))+
+  
+  ylim(-1, 1.06)+
+  #scale_colour_discrete(name="No DIF Routing\nProbability",  direction=1)+
+  scale_color_grey(name="MST adaptive path")+
+
+  scale_shape_discrete(name="MST adaptive path")+
+  scale_linetype_manual(scale_name="", values=1)+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  ggsave(filename = paste0("D:/DIF in MST Routing in ILSA/Graphs for submission/",
+                     "Proficiency Recovery_Low Perf_Bias_a.tiff"), device = "tiff",
+  width = 35, height = 20, units = "cm", dpi = 600, compression = "lzw+p")
+
+# Medium performers
+ggplot(data = all2gen_mst[which(all2gen_mst$Country_gen == "Medium"),], 
+       mapping=aes(x=`DIFmag`, y=PV_Bias, shape=`mstpath`, 
+                   size = N
+                  # shape = `Country`
+                  ))+
+  geom_point(alpha = 0.5)+
+  facet_grid(Prob ~ DIFper + DIFloc , scales = "free_x")+
+  labs( x = "DIF Magnitude" , y= "Proficiency Bias \n Medium Performing Country",
+        shape = "MST adaptive path")+
+  
+ # geom_hline(aes(yintercept = PV_Bias, colour = `mstpath`))+
+  geom_hline(aes(yintercept = 0), linetype = "dashed", color ="grey" )+
+  scale_shape_manual(values=c(0, 1, 2, 5,9,10))+
+
+   ylim(-1, 1.06)+
+  #scale_colour_discrete(name="No DIF Routing\nProbability",  direction=1)+
+  scale_color_grey(name="MST adaptive path")+
+
+  scale_shape_discrete(name="MST adaptive path")+
+  scale_linetype_manual(scale_name="", values=1)+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  ggsave(filename = paste0("D:/DIF in MST Routing in ILSA/Graphs for submission/",
+                     "Proficiency Recovery_Med Perf_Bias_b.tiff"), device = "tiff",
+  width = 35, height = 20, units = "cm", dpi = 600, compression = "lzw+p")
+
+ggplot(data = all2gen_mst[which(all2gen_mst$Country_gen == "High"),], 
+       mapping=aes(x=`DIFmag`, y=PV_Bias, shape=`mstpath`, 
+                   size = N
+                  # shape = `Country`
+                  ))+
+  geom_point(alpha = 0.5)+
+  facet_grid(Prob ~ DIFper + DIFloc, scales = "free_x" )+
+  labs( x = "DIF Magnitude" , y= "Proficiency Bias \n High Performing Country",
+        shape = "MST adaptive path")+
+  
+  #geom_hline(aes(yintercept = PV_Bias, colour = `mstpath`))+
+  geom_hline(aes(yintercept = 0), linetype = "dashed", color ="grey" )+
+  scale_shape_manual(values=c(0, 1, 2, 5,9,10))+
+
+  ylim(-1, 1.06)+
+  #scale_colour_discrete(name="No DIF Routing\nProbability",  direction=1)+
+  scale_color_grey(name="MST adaptive path")+
+
+  scale_shape_discrete(name="MST adaptive path")+
+  scale_linetype_manual(scale_name="", values=1)+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  ggsave(filename = paste0("D:/DIF in MST Routing in ILSA/Graphs for submission/",
+                     "Proficiency Recovery_High Perf_Bias_c.tiff"), device = "tiff",
+  width = 35, height = 20, units = "cm", dpi = 600, compression = "lzw+p")
+
+
+ggplot(data = all2gen_mst, 
+       mapping=aes(x=`DIFmag`, y=PV_Bias, shape=`mstpath`, 
+                   size = N
+                  # shape = `Country`
+                  ))+
+  geom_point(alpha = 0.5)+
+  facet_grid(Prob ~ DIFper + DIFloc, scales = "free_x" )+
+  labs( x = "DIF Magnitude" , y= "Proficiency Bias \n High Performing Country",
+        shape = "MST adaptive path")+
+  
+  #geom_hline(aes(yintercept = PV_Bias, colour = `mstpath`))+
+  geom_hline(aes(yintercept = 0), linetype = "dashed", color ="grey" )+
+  scale_shape_manual(values=c(0, 1, 2, 5,9,10))+
+
+  ylim(-1, 1.06)+
+  #scale_colour_discrete(name="No DIF Routing\nProbability",  direction=1)+
+  scale_color_grey(name="MST adaptive path")+
+
+  scale_shape_discrete(name="MST adaptive path")+
+  scale_linetype_manual(scale_name="", values=1)+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  ggsave(filename = paste0("D:/DIF in MST Routing in ILSA/Graphs for submission/",
+                     "Proficiency Recovery_RMSE_c.tiff"), device = "tiff",
+  width = 35, height = 20, units = "cm", dpi = 600, compression = "lzw+p")
+
+
+```
+
+### RMSE for mst adaptive paths with Leslie's feedback
+
+```{r}
+# Low performers
+ggplot(data = all2gen_mst[which(all2gen_mst$Country_gen == "Low"),], 
+       mapping=aes(x=`DIFmag`, y=RMSE, shape=`mstpath`, 
+                   size = N
+                  # shape = `Country`
+                  ))+
+  geom_point(alpha = 0.5)+
+  facet_grid(Prob ~ DIFper + DIFloc , scales = "free_x")+
+  labs( x = "DIF Magnitude" , y= "Proficiency RMSE \n Low Performing Country",
+        shape = "MST adpative path")+
+  
+ # geom_hline(aes(yintercept = RMSE, colour = `mstpath`))+
+  geom_hline(aes(yintercept = 0), linetype = "dashed", color ="grey" )+
+  scale_shape_manual(values=c(0, 1, 2, 5,9,10))+
+  
+  ylim(-1, 1.06)+
+  #scale_colour_discrete(name="No DIF Routing\nProbability",  direction=1)+
+  scale_color_grey(name="MST adaptive path")+
+
+  scale_shape_discrete(name="MST adaptive path")+
+  scale_linetype_manual(scale_name="", values=1)+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  ggsave(filename = paste0("D:/DIF in MST Routing in ILSA/Graphs for submission/",
+                     "Proficiency Recovery_Low Perf_RMSE_a.tiff"), device = "tiff",
+  width = 35, height = 20, units = "cm", dpi = 600, compression = "lzw+p")
+
+# Medium performers
+ggplot(data = all2gen_mst[which(all2gen_mst$Country_gen == "Medium"),], 
+       mapping=aes(x=`DIFmag`, y=RMSE, shape=`mstpath`, 
+                   size = N
+                  # shape = `Country`
+                  ))+
+  geom_point(alpha = 0.5)+
+  facet_grid(Prob ~ DIFper + DIFloc , scales = "free_x")+
+  labs( x = "DIF Magnitude" , y= "Proficiency RMSE \n Medium Performing Country",
+        shape = "MST adaptive path")+
+  
+ # geom_hline(aes(yintercept = RMSE, colour = `mstpath`))+
+  geom_hline(aes(yintercept = 0), linetype = "dashed", color ="grey" )+
+  scale_shape_manual(values=c(0, 1, 2, 5,9,10))+
+
+   ylim(-1, 1.06)+
+  #scale_colour_discrete(name="No DIF Routing\nProbability",  direction=1)+
+  scale_color_grey(name="MST adaptive path")+
+
+  scale_shape_discrete(name="MST adaptive path")+
+  scale_linetype_manual(scale_name="", values=1)+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  ggsave(filename = paste0("D:/DIF in MST Routing in ILSA/Graphs for submission/",
+                     "Proficiency Recovery_Med Perf_RMSE_b.tiff"), device = "tiff",
+  width = 35, height = 20, units = "cm", dpi = 600, compression = "lzw+p")
+
+ggplot(data = all2gen_mst[which(all2gen_mst$Country_gen == "High"),], 
+       mapping=aes(x=`DIFmag`, y=RMSE, shape=`mstpath`, 
+                   size = N
+                  # shape = `Country`
+                  ))+
+  geom_point(alpha = 0.5)+
+  facet_grid(Prob ~ DIFper + DIFloc, scales = "free_x" )+
+  labs( x = "DIF Magnitude" , y= "Proficiency RMSE \n High Performing Country",
+        shape = "MST adaptive path")+
+  
+  #geom_hline(aes(yintercept = RMSE, colour = `mstpath`))+
+  geom_hline(aes(yintercept = 0), linetype = "dashed", color ="grey" )+
+  scale_shape_manual(values=c(0, 1, 2, 5,9,10))+
+
+  ylim(-1, 1.06)+
+  #scale_colour_discrete(name="No DIF Routing\nProbability",  direction=1)+
+  scale_color_grey(name="MST adaptive path")+
+
+  scale_shape_discrete(name="MST adaptive path")+
+  scale_linetype_manual(scale_name="", values=1)+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  ggsave(filename = paste0("D:/DIF in MST Routing in ILSA/Graphs for submission/",
+                     "Proficiency Recovery_High Perf_RMSE_c.tiff"), device = "tiff",
+  width = 35, height = 20, units = "cm", dpi = 600, compression = "lzw+p")
+
+
+```
+
+### Bias and RMSE averaged across countries
+
+```{r}
+#call in directory
+setwd("D:/DIF in MST Routing in ILSA/DIF in MST Analysis/Results Latent Regression Apr 2021/Person Parameter Results/Country/")
+# call in data
+
+files <- dir(pattern = "*.Rbin")
+files
+
+all <- files %>%
+  map(loadObject) %>%
+  reduce(rbind)
+```
+
+```{r, include=FALSE, warning=FALSE}
+#Clean data
+## make them factors
+all$DIFmag = as.factor(all$DIFmag)
+all$DIFper = as.factor(all$DIFper)
+all$Prob = as.factor(all$Prob)
+#demark the order
+all1 <- all %>% 
+  mutate(Country = fct_relevel(Country, "SGP", "KOR", "TWN", "SWE", "MLT", "MYS", "MAR", "ZAF", "SAU"),
+         DIFmag = fct_relevel(DIFmag, "0.25", "0.5", "1", "NoDIF"),
+         DIFloc = fct_relevel(DIFloc, "Core", "Stage 1", "Stage 2", "NoDIF")) 
+#define the labels
+all1$DIFper <- plyr::mapvalues(all1$DIFper, from = c("11", "33", "56"), to = c("11%", "33%", "56%"))  
+all1$DIFmag <- plyr::mapvalues(all1$DIFmag, from = c("0.25","0.5", "1"), to = c("0.25","0.50", "1.00"))  
+#all1$DIFloc <- plyr::mapvalues(all1$DIFloc, from = c("core","Stg1", "stg2"), to = c("Core","Stage 1", "Stage 2"))  
+all1$Prob <- plyr::mapvalues(all1$Prob, from = c("0.5","0.7", "1"), to = c("Random","M+PM", "Merit"))  
+all1$Country <- factor(all1$Country, 
+                       levels = c("SGP", "KOR", "TWN", "SWE", "MLT", "MYS", "MAR", "ZAF", "SAU"),
+                       labels = c("High 1", "High 2", "High 3",
+                                  "Medium 1", "Medium 2", "Medium 3",
+                                  "Low 1", "Low 2", "Low 3"))
+all1$Country_gen <- factor(all1$Country, 
+                       levels = c("High 1", "High 2", "High 3",
+                                  "Medium 1", "Medium 2", "Medium 3",
+                                  "Low 1", "Low 2", "Low 3"),
+                       labels = c("High", "High", "High",
+                                  "Medium", "Medium", "Medium",
+                                  "Low", "Low", "Low"))
+  
+
+all2gen <- all1%>%
+  group_by(Country_gen, Prob, DIFmag, DIFloc, DIFper) %>%
+  dplyr::summarize(TH0 = mean(TH0),
+                  # Eth = mean(Eth),
+                   PV = mean(PV),
+                  # Esd = mean(Esd),
+                  # SE = mean(Ese),
+                  # Bias = mean(bias),
+                   PV_AbsBias = mean(abs.bias_pv),
+                   PV_Bias = mean(bias_pv),
+                   PV_AbsBias = mean(abs.bias_pv),
+                   Variance = mean(Mvar_PV),
+                   RMSE = mean(RMSE),
+                   SE = mean(se.Dim1)) 
+                   #PV_RMSE = mean(RMSE_pv))
+```
+
+
+```{r}
+ggplot(data = all2gen, 
+       mapping=aes(x=`DIFmag`, y=PV_Bias, shape=`Prob`))+
+  geom_point(alpha = 0.5, size = 3)+
+  facet_grid(Country_gen ~ DIFper + DIFloc , scales = "free_x")+
+  labs( x = "DIF Magnitude" , y= "Proficiency Bias"#,
+        #shape = "MST adaptive path"
+        )+
+  
+ # geom_hline(aes(yintercept = PV_Bias, colour = `mstpath`))+
+  #geom_hline(aes(yintercept = 0), linetype = "dashed", color ="grey" )+
+  #scale_shape_manual(values=c(0, 1, 2, 5,9,10))+
+  
+  ylim(-1, 1)+
+  #scale_colour_discrete(name="No DIF Routing\nProbability",  direction=1)+
+  scale_color_grey(name="Routing Probability")+
+
+ # scale_shape_discrete(name="MST adaptive path")+
+  #scale_linetype_manual(scale_name="", values=1)+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  ggsave(filename = paste0("D:/DIF in MST Routing in ILSA/Graphs for submission/",
+                    "Proficiency Recovery_Average_Bias_a.tiff"), device = "tiff",
+  width = 35, height = 20, units = "cm", dpi = 600, compression = "lzw+p")
+
+ggplot(data = all2gen, 
+       mapping=aes(x=`DIFmag`, y=RMSE, shape=`Prob`))+
+  geom_point(alpha = 0.5, size = 3)+
+  facet_grid(Country_gen ~ DIFper + DIFloc , scales = "free_x")+
+  labs( x = "DIF Magnitude" , y= "Proficiency RMSE"#,
+        #shape = "MST adaptive path"
+        )+
+  
+ # geom_hline(aes(yintercept = PV_Bias, colour = `mstpath`))+
+  #geom_hline(aes(yintercept = 0), linetype = "dashed", color ="grey" )+
+  #scale_shape_manual(values=c(0, 1, 2, 5,9,10))+
+  
+  ylim(0, 0.8)+
+  #scale_colour_discrete(name="No DIF Routing\nProbability",  direction=1)+
+  scale_color_grey(name="Routing Probability")+
+
+ # scale_shape_discrete(name="MST adaptive path")+
+  #scale_linetype_manual(scale_name="", values=1)+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  ggsave(filename = paste0("D:/DIF in MST Routing in ILSA/Graphs for submission/",
+                    "Proficiency Recovery_Average_RMSE_a.tiff"), device = "tiff",
+  width = 35, height = 20, units = "cm", dpi = 600, compression = "lzw+p")
+
+```
+
+
+
+# Item parameter analysis
+
+```{r, include=FALSE}
+#rm(list=ls())
+#load libraries
+library("tidyverse")
+library("R.utils")
+library(viridis)
+library(forcats)
+library(hrbrthemes)
+#citems in directory
+setwd("D:/DIF in MST Routing in ILSA/DIF in MST Analysis/Results Latent Regression Apr 2021/Rescaled Item Parameters/")
+# citems in data
+#a = loadObject("stg1.1_11_1_p79.Rbin")
+
+files <- dir(pattern = "*.Rbin")
+files
+
+items <- files %>%
+  map(loadObject) %>%
+  reduce(rbind)
+
+#Clean data
+## make them factors
+items$DIFmag = as.factor(items$DIFmag)
+items$DIFper = as.factor(items$DIFper)
+items$Prob = as.factor(items$Prob)
+
+#define the labels
+items$DIFper <- plyr::mapvalues(items$DIFper, from = c("11", "33", "56"), to = c("11%", "33%", "56%"))  
+items$DIFmag <- plyr::mapvalues(items$DIFmag, from = c("0.25","0.5", "1"), to = c("0.25","0.50", "1.00"))  
+items$DIFloc = factor(items$DIFloc, levels = c("NoDIF", "Core", "Stage 1", "Stage 2"))
+
+items$DIFloc <- plyr::mapvalues(items$DIFloc, from = c("Core","Stage 1", "stage 2"), to = c("Core","Stage 1", "Stage 2"))  
+items$Prob <- plyr::mapvalues(items$Prob, from = c("0.5","0.7", "1"), to = c("Random","M+PM", "Merit"))  
+items$item_number <- rep(1:72)
+items$modules = ifelse(items$item_number <= 12, "MOD 1",
+                ifelse(items$item_number >= 13 & items$item_number <= 24, "MOD 2",
+                ifelse(items$item_number >= 25 & items$item_number <= 36, "MOD 3",
+                ifelse(items$item_number >= 37 & items$item_number <= 48, "MOD 4",
+                ifelse(items$item_number >= 49 & items$item_number <= 60, "MOD 5",
+                ifelse(items$item_number >= 61 & items$item_number <= 72, "MOD 6", NA))))))
+
+# Rename modules in terms of difficulty and then order in terms of difficulty level
+table(items$modules)
+level_key = c(`MOD 1` = "Moderate (C)", 
+              `MOD 2` =  "Easy (S1)", 
+              `MOD 3` = "Difficult (S1)",
+              `MOD 4` = "Easy (S2)",
+              `MOD 5` = "Moderate (S2)",
+              `MOD 6` = "Difficult (S2)")
+items$modules_difficulty = recode(items$modules, !!!level_key)
+
+items$modules_difficulty = factor(items$modules_difficulty, 
+                                  levels = c("Moderate (C)", "Easy (S1)","Difficult (S1)",
+                                            "Easy (S2)", "Moderate (S2)","Difficult (S2)"))
+# reference item paramters
+location_ref = items[which(items$DIFmag == "NoDIF" ), "it.b"]
+location_ref2 = location_ref[1:72]
+items$loc_ref = location_ref2
+
+slope_ref = items[which(items$DIFmag == "NoDIF" ), "it.a"]
+slope_ref2 = slope_ref[1:72]
+items$slp_ref = slope_ref2
+
+
+```
+
+
+
+
+## Scatterplots
+
+
+```{r}
+ggplot(data = items, 
+       mapping=aes(x= loc_ref, y = it.b,  shape = modules_difficulty 
+                  ))+
+  geom_point(alpha = 0.5, size = 1)+
+  geom_abline(intercept = 0, slope = 1, color = "grey")+
+  scale_shape_manual(values=c(0, 1, 2, 3, 4, 5))+
+  #facet_grid(DIFper ~  .)+
+  facet_grid( Prob ~ DIFmag + DIFper)+
+  labs( x = "Generated Location" , y = "Estimated Difficulty", shape = "Module (Stage)")+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  ggsave(filename = paste0("D:/DIF in MST Routing in ILSA/Graphs for submission/",
+                           "Scatterplot location.tiff"), device = "tiff",
+        width = 35, height = 20, units = "cm",  dpi = 600, compression = "lzw+p")
+
+ggplot(data = items, 
+       mapping=aes(x=slp_ref, y=it.a, shape = modules_difficulty 
+                  ))+
+  geom_point(alpha = 0.5, size = 1)+
+  geom_abline(intercept = 0, slope = 1, color = "grey")+
+  scale_shape_manual(values=c(0, 1, 2, 3, 4, 5))+
+  #facet_grid(DIFper ~  .)+
+  facet_grid( Prob ~ DIFmag + DIFper)+
+  labs( x = "Generated Slope" , y = "Estimated Slope", shape = "Module (Stage)")+
+  theme_apa(legend.use.title = TRUE)+
+  theme(text = element_text(size = 12, family = "Times New Roman"))+
+  ggsave(filename = paste0("D:/DIF in MST Routing in ILSA/Graphs for submission/",
+                           "Scatterplot slope.tiff"), device = "tiff",
+        width = 35, height = 20, units = "cm", dpi = 600, compression = "lzw+p")
+```
+
+# Accuracy
+
+```{r}
+#rm(list = ls())
+
+Results_stg1 = read.csv("D:\\DIF in MST Routing in ILSA\\Data Analysis\\Stage 1 Accuracy results.csv", header = T)
+
+
+
+all2gen_stg1 <- Results_stg1%>%
+  group_by(Country_gen, Prob.y, DIFmag.y, DIFloc.y, DIFper.y) %>%
+  dplyr::summarize(MOD1 = mean(MOD1.m),
+                   MOD2 = mean(MOD2.m),
+                   MOD3 = mean(MOD3.m),
+                   OP1 =round(mean(OP1.M),3),
+                   OP2 =round(mean(OP2.M),3)) 
+
+
+all2gen_stg1$DIFmag.y = factor(all2gen_stg1$DIFmag.y, levels = c(".25", ".50", "1","NoDIF"), ordered = TRUE)
+all2gen_stg1$DIFper.y = factor(all2gen_stg1$DIFper.y, levels = c( "11", "33", "56", "NoDIF"), 
+                          labels = c( "11%", "33%", "56%", "NoDIF"))
+all2gen_stg1$Prob.y = factor(all2gen_stg1$Prob.y, levels = c("1", "0.7", "0.5"), 
+                        labels = c("Merit", "M+PM", "Random"))
+
+#========================================
+Result = read.csv("D:\\DIF in MST Routing in ILSA\\Data Analysis\\OptmodCore.csv", header = TRUE)
+
+Result$Country <- factor(Result$Country.y, 
+                       levels = c("SGP", "KOR", "TWN", "SWE", "MLT", "MYS", "MAR", "ZAF", "SAU"),
+                       labels = c("High 1", "High 2", "High 3",
+                                  "Medium 1", "Medium 2", "Medium 3",
+                                  "Low 1", "Low 2", "Low 3"))
+Result$Country_gen <- factor(Result$Country, 
+                           levels = c("High 1", "High 2", "High 3",
+                                      "Medium 1", "Medium 2", "Medium 3",
+                                      "Low 1", "Low 2", "Low 3"),
+                           labels = c("High", "High", "High",
+                                      "Medium", "Medium", "Medium",
+                                      "Low", "Low", "Low"))
+all2gen <- Result%>%
+  group_by(Country_gen, Prob.y, DIFmag.y, DIFloc.y, DIFper.y) %>%
+  dplyr::summarize(MOD1 = mean(MOD1.m),
+                   MOD2 = mean(MOD2.m),
+                   MOD3 = mean(MOD3.m),
+                   OP1 =round(mean(OP1.M),3),
+                   OP2 =round(mean(OP2.M),3)) 
+
+
+all2gen$DIFmag.y = factor(all2gen$DIFmag.y, levels = c("NoDIF", ".25", ".50", "1"), ordered = TRUE)
+all2gen$DIFper.y = factor(all2gen$DIFper.y, levels = c("NoDIF","11", "33", "56" ), 
+                          labels = c( "NoDIF", "11%", "33%", "56%"), ordered = TRUE)
+all2gen$Prob.y = factor(all2gen$Prob.y, levels = c("1", "0.7", "0.5"), 
+                             labels = c("Merit", "M+PM", "Random"))
+
+```
+
+```{r}
+# Graphs STG 1 Module and Path Accuracy
+#======================================
+
+
+
+p1 = all2gen %>%
+  #mutate(DIFmag.y = factor(DIFmag.y, levels = c("NoDIF",".25", ".50", "1")))%>%
+  ggplot( 
+            mapping=aes(x=`Prob.y`, y=MOD2))+
+  geom_point(alpha = 0.5, size = 3)+
+  facet_grid(~DIFper.y+DIFmag.y)+
+  ylim(.90,1)+
+  labs( x = " ", y= " ")+
+  theme(axis.text.x = element_text(angle = 70))
+p1 = annotate_figure(p1,
+                     top = text_grob("DIF in Core - Core to Stage1"))
+p1
+p2 = ggplot(data=all2gen[which(all2gen$DIFmag.y != "NoDIF"),],
+       mapping=aes(x=`Prob.y`, y=MOD3))+
+  geom_point(alpha = 0.5, size = 3)+
+  facet_grid(~DIFper.y+DIFmag.y)+
+  ylim(.90,1)+
+  labs( x = " ", y= " ")+
+  theme(axis.text.x = element_text(angle = 70))
+p2 = annotate_figure(p2,
+                     top = text_grob("DIF in Core - Stage 1 to Stage2")  )
+p2
+p3 = ggplot(data=all2gen_stg1[which(all2gen_stg1$DIFmag.y != "NoDIF"),], 
+       mapping=aes(x=`Prob.y`, y=MOD3))+
+  geom_point(alpha = 0.5, size = 3)+
+  facet_grid(~DIFper.y+DIFmag.y)+
+  ylim(.90,1)+
+  labs( x = " ", y= " ")+
+  theme(axis.text.x = element_text(angle = 70))
+p3 = annotate_figure(p3,
+                     top = text_grob("DIF in Stage 1 - Stage 1 to Stage2"))
+p3
+
+library(ggpubr)
+p = ggarrange(p1, p2, p3, nrow = 1)
+p = annotate_figure(p,
+                    bottom = text_grob("Routing Probability"),
+                    left = text_grob("Proportion of Optimal Routing (No DIF = DIF in Modulue)",
+                                     rot = 90))
+p+ggsave(filename = paste0("D:/DIF in MST Routing in ILSA/Graphs for submission/",
+                           "Accuracy.tiff"), device = "tiff",
+        width = 35, height = 20, units = "cm", dpi = 600, compression = "lzw+p")
+  
+# width 1500 and length 1000
+
+```
+
+
+```{r}
+library(ggpubr)
+setwd("D:/DIF in MST Routing in ILSA/Data Analysis/")
+
+all <- read.csv("all.csv", header = TRUE)
+core = read.csv("OptmodCore.csv", header = TRUE)
+stg1 = read.csv("OptmodStg1.csv", header = TRUE)
+stg2 = read.csv("OptmodStg2.csv", header = TRUE)
+
+
+
+all1 = read.csv("all_DIF.csv", header = TRUE)
+library(tidyverse)
+all1$DIFmag.y = as.factor(all1$DIFmag.y)
+all1$DIFper.y = as.factor(all1$DIFper.y)
+all1$Prob.y = as.factor(all1$Prob.y)
+all1$DIFper.y <- plyr::mapvalues(all1$DIFper.y, from = c("11", "33", "56"), to = c("11%", "33%", "56%"))  
+all1$DIFmag.y <- plyr::mapvalues(all1$DIFmag.y, from = c("0.25","0.5", "1"), to = c("0.25","0.50", "1.00"))  
+all1$DIFmag.y <- plyr::mapvalues(all1$DIFmag.y, from = c(".5"), to = c(".50"))  
+all1$Prob.y <- plyr::mapvalues(all1$Prob.y, from = c("0.5","0.7", "1"), to = c("Random","M+PM", "Merit"))  
+all1$Country.y <- plyr::mapvalues(all1$Country.y, from = c("MAR","SAU", "ZAF"), to = c("Low 1","Low 2", "Low 3"))  
+
+
+
+```
+
+```{r}
+
+a = ggplot(data=all1[which(all1$DIFloc.y == "Core" ),], 
+       mapping = aes(x=`DIFmag.y`, y=MOD2.m, shape=`Prob.y`, colour = `Country.y`))+
+  geom_point(alpha = 0.5, size = 3)+
+  facet_wrap(~ `DIFper.y` , nrow=1)+
+  labs( x = " ", y= " ",
+        shape = "Routing Probability")+
+ ylim(.9, 1.0)+
+  guides(colour = FALSE, shape = FALSE)
+b = ggplot(data=all1[which(all1$DIFloc.y == "Core" ),], 
+       mapping = aes(x=`DIFmag.y`, y=MOD3.m, shape=`Prob.y`, colour = `Country.y`))+
+  geom_point(alpha = 0.5, size = 3)+
+  facet_wrap(~ `DIFper.y` , nrow=1)+
+  labs( x = "", y = " ")+#, y= "Percentage of Stage 1 Module Selection (No DIF = DIF Core)",
+  #      shape = "Routing Probability")+
+  ylim(.9, 1.0)+
+  guides(colour = FALSE, shape = FALSE)
+c = ggplot(data=all1[which(all1$DIFloc.y == "stg1" ),], 
+       mapping = aes(x=`DIFmag.y`, y=MOD3.m, shape=`Prob.y`, colour = `Country.y`))+
+  geom_point(alpha = 0.5, size = 3)+
+  facet_wrap(~ `DIFper.y` , nrow=1)+
+  labs( x = "", y= "",
+        shape = "Routing Probability", colour = "Country")+
+  ylim(.9, 1.0)+
+  guides(colour = FALSE, shape = FALSE)
+
+grid.arrange(a,b,c, ncol = 3)
+```
+```{r}
+#by probability
+d = ggplot(data=all1[which(all1$DIFloc.y == "Core" ),], 
+           mapping = aes(x=`DIFmag.y`, y=MOD2.m, shape=`DIFper.y`, colour = `Country.y`))+
+  geom_point(alpha = 0.5, size = 3)+
+  facet_wrap(~ `Prob.y` , nrow=1)+
+  labs( x = " ", y= "Percentage of Optimal Module Selection (No DIF = DIF in Module)",
+        shape = "Routing Probability")+
+  ylim(.9, 1.0)+
+  guides(colour = FALSE, shape = FALSE)
+e = ggplot(data=all1[which(all1$DIFloc.y == "Core" ),], 
+           mapping = aes(x=`DIFmag.y`, y=MOD3.m, shape=`DIFper.y`, colour = `Country.y`))+
+  geom_point(alpha = 0.5, size = 3)+
+  facet_wrap(~ `Prob.y` , nrow=1)+
+  labs( x = "DIF magnitude", y = " ")+#, y= "Percentage of Stage 1 Module Selection (No DIF = DIF Core)",
+  #      shape = "Routing Probability")+
+  ylim(.9, 1.0)+
+  guides(colour = FALSE, shape = FALSE)
+f = ggplot(data=all1[which(all1$DIFloc.y == "stg1" ),], 
+           mapping = aes(x=`DIFmag.y`, y=MOD3.m, shape=`DIFper.y`, colour = `Country.y`))+
+  geom_point(alpha = 0.5, size = 3)+
+  facet_wrap(~ `Prob.y` , nrow=1)+
+  labs( x = "", y= "",
+        shape = "Routing Probability")+
+  ylim(.9, 1.0)#+
+  guides(colour = FALSE, shape = FALSE)
+
+grid.arrange(d,e,f, ncol = 3)
+
+```
+
+

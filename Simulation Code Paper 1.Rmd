@@ -1,0 +1,1274 @@
+---
+title: "Simulation Code Paper 1"
+author: "Montserrat Valdivia"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+path = getwd()
+
+library(tidyverse)
+library(dplyr)
+library(TAM)
+library(R.utils)
+
+install.packages(paste0(path, "/mstRforLR/v1.2/mstRforLR_1.2.zip"), 
+                 repos = NULL, type = "win.binary")
+library("mstRforLR") 
+library(readr)
+
+```
+
+### Conditions
+
+```{r}
+path = "C:/Users/Montse/OneDrive - Indiana University/Dissertation/Data Analysis/Paper 1"
+# Call true item parameters
+itembank = read.csv(paste0(path, "/Data/item bank for modules.csv"), header = T)
+items = data.frame(itemN = paste0("i", 1:nrow(itembank)),
+                   module = itembank$module,
+                   a = itembank$Slope,
+                   b = itembank$Location,
+                   c = 0, 
+                   d = 1)
+# Call true group proficiency means and sd (logit scale)
+
+achievement <- read_csv(paste0(path, "/Data/Achievement.csv"))
+```
+
+```{r}
+#################################################################################
+#                              Assignment of modules                            #
+#################################################################################
+modules <- matrix(0, 72, 6)
+modules[1:12, 1] <- modules[13:24, 2] <- modules[25:36, 3] <- modules[37:48, 4] <- modules[49:60, 5] <- modules[61:72, 6]<- 1
+
+colSums(modules)
+
+# Cration of the transition matrix to define a 123 MST
+trans <- matrix(0, 6, 6)
+trans[1, 2:3] <- trans[2, 4:5] <- trans[3, 5:6]<-1
+trans
+
+#cut scores
+cut_score = matrix(c(2, 3, 7,  4, 5, 9,  5, 6, 17), ncol = 3, byrow = T)
+
+```
+
+
+```{r}
+DIF_conditions = list(
+  # BASELINE - No DIF percentage or magnitude for each difficulty level (bb)
+  d01 = list(mm = 0,  pp =   0, ll = "Core",    rp = 1), 
+  d02 = list(mm = 0,  pp =   0, ll = "Stage 1", rp = 1), 
+  d03 = list(mm = 0,  pp =   0, ll = "Stage 2", rp = 1),
+  d04 = list(mm = 0,  pp =   0, ll = "Core",    rp = .7), 
+  d05 = list(mm = 0,  pp =   0, ll = "Stage 1", rp = .7), 
+  d06 = list(mm = 0,  pp =   0, ll = "Stage 2", rp = .7), 
+  d07 = list(mm = 0,  pp =   0, ll = "Core",    rp = .5), 
+  d08 = list(mm = 0,  pp =   0, ll = "Stage 1", rp = .5), 
+  d09 = list(mm = 0,  pp =   0, ll = "Stage 2", rp = .5),   
+  # Different combinations of DIF when DIF is only on the Core module
+  d10 = list(mm = .30,  pp = 1/12, ll = "Core", rp = 1),
+  d11 = list(mm = .60,  pp = 1/12, ll = "Core", rp = 1),
+  d12 = list(mm = 1.40, pp = 1/12, ll = "Core", rp = 1),
+  d13 = list(mm = .30,  pp = 3/12, ll = "Core", rp = 1),
+  d14 = list(mm = .60,  pp = 3/12, ll = "Core", rp = 1),
+  d15 = list(mm = 1.40, pp = 3/12, ll = "Core", rp = 1),
+  d16 = list(mm = .30,  pp = 5/12, ll = "Core", rp = 1),
+  d17 = list(mm = .60,  pp = 5/12, ll = "Core", rp = 1),
+  d18 = list(mm = 1.40, pp = 5/12, ll = "Core", rp = 1),
+  d19 = list(mm = .30,  pp = 1/12, ll = "Core", rp = .7),
+  d20 = list(mm = .60,  pp = 1/12, ll = "Core", rp = .7),
+  d21 = list(mm = 1.40, pp = 1/12, ll = "Core", rp = .7),
+  d22 = list(mm = .30,  pp = 3/12, ll = "Core", rp = .7),
+  d23 = list(mm = .60,  pp = 3/12, ll = "Core", rp = .7),
+  d24 = list(mm = 1.40, pp = 3/12, ll = "Core", rp = .7),
+  d25 = list(mm = .30,  pp = 5/12, ll = "Core", rp = .7),
+  d26 = list(mm = .60,  pp = 5/12, ll = "Core", rp = .7),
+  d27 = list(mm = 1.40, pp = 5/12, ll = "Core", rp = .7),
+  d28 = list(mm = .30,  pp = 1/12, ll = "Core", rp = .5),
+  d29 = list(mm = .60,  pp = 1/12, ll = "Core", rp = .5),
+  d30 = list(mm = 1.40, pp = 1/12, ll = "Core", rp = .5),
+  d31 = list(mm = .30,  pp = 3/12, ll = "Core", rp = .5),
+  d32 = list(mm = .60,  pp = 3/12, ll = "Core", rp = .5),
+  d33 = list(mm = 1.40, pp = 3/12, ll = "Core", rp = .5),
+  d34 = list(mm = .30,  pp = 5/12, ll = "Core", rp = .5),
+  d35 = list(mm = .60,  pp = 5/12, ll = "Core", rp = .5),
+  d36 = list(mm = 1.40, pp = 5/12, ll = "Core", rp = .5),
+  # Different combinations of DIF when DIF is only on the Stage 1 modules
+  d37 = list(mm = .30,  pp = 1/12, ll = "Stage 1", rp = 1),
+  d38 = list(mm = .60,  pp = 1/12, ll = "Stage 1", rp = 1),
+  d39 = list(mm = 1.40, pp = 1/12, ll = "Stage 1", rp = 1),
+  d40 = list(mm = .30,  pp = 3/12, ll = "Stage 1", rp = 1),
+  d41 = list(mm = .60,  pp = 3/12, ll = "Stage 1", rp = 1),
+  d42 = list(mm = 1.40, pp = 3/12, ll = "Stage 1", rp = 1),
+  d43 = list(mm = .30,  pp = 5/12, ll = "Stage 1", rp = 1),
+  d44 = list(mm = .60,  pp = 5/12, ll = "Stage 1", rp = 1),
+  d45 = list(mm = 1.40, pp = 5/12, ll = "Stage 1", rp = 1),
+  d46 = list(mm = .30,  pp = 1/12, ll = "Stage 1", rp = .7),
+  d47 = list(mm = .60,  pp = 1/12, ll = "Stage 1", rp = .7),
+  d48 = list(mm = 1.40, pp = 1/12, ll = "Stage 1", rp = .7),
+  d49 = list(mm = .30,  pp = 3/12, ll = "Stage 1", rp = .7),
+  d50 = list(mm = .60,  pp = 3/12, ll = "Stage 1", rp = .7),
+  d51 = list(mm = 1.40, pp = 3/12, ll = "Stage 1", rp = .7),
+  d52 = list(mm = .30,  pp = 5/12, ll = "Stage 1", rp = .7),
+  d53 = list(mm = .60,  pp = 5/12, ll = "Stage 1", rp = .7),
+  d54 = list(mm = 1.40, pp = 5/12, ll = "Stage 1", rp = .7),
+  d55 = list(mm = .30,  pp = 1/12, ll = "Stage 1", rp = .5),
+  d56 = list(mm = .60,  pp = 1/12, ll = "Stage 1", rp = .5),
+  d57 = list(mm = 1.40, pp = 1/12, ll = "Stage 1", rp = .5),
+  d58 = list(mm = .30,  pp = 3/12, ll = "Stage 1", rp = .5),
+  d59 = list(mm = .60,  pp = 3/12, ll = "Stage 1", rp = .5),
+  d60 = list(mm = 1.40, pp = 3/12, ll = "Stage 1", rp = .5),
+  d61 = list(mm = .30,  pp = 5/12, ll = "Stage 1", rp = .5),
+  d62 = list(mm = .60,  pp = 5/12, ll = "Stage 1", rp = .5),
+  d63 = list(mm = 1.40, pp = 5/12, ll = "Stage 1", rp = .5),
+  # Different combinations of DIF when DIF is only on the Stage 2 modules
+  d64 = list(mm = .30,  pp = 1/12, ll = "Stage 2", rp = 1),
+  d65 = list(mm = .60,  pp = 1/12, ll = "Stage 2", rp = 1),
+  d66 = list(mm = 1.40, pp = 1/12, ll = "Stage 2", rp = 1),
+  d67 = list(mm = .30,  pp = 3/12, ll = "Stage 2", rp = 1),
+  d68 = list(mm = .60,  pp = 3/12, ll = "Stage 2", rp = 1),
+  d69 = list(mm = 1.40, pp = 3/12, ll = "Stage 2", rp = 1),
+  d70 = list(mm = .30,  pp = 5/12, ll = "Stage 2", rp = 1),
+  d71 = list(mm = .60,  pp = 5/12, ll = "Stage 2", rp = 1),
+  d72 = list(mm = 1.40, pp = 5/12, ll = "Stage 2", rp = 1),
+  d73 = list(mm = .30,  pp = 1/12, ll = "Stage 2", rp = .7),
+  d74 = list(mm = .60,  pp = 1/12, ll = "Stage 2", rp = .7),
+  d75 = list(mm = 1.40, pp = 1/12, ll = "Stage 2", rp = .7),
+  d76 = list(mm = .30,  pp = 3/12, ll = "Stage 2", rp = .7),
+  d77 = list(mm = .60,  pp = 3/12, ll = "Stage 2", rp = .7),
+  d78 = list(mm = 1.40, pp = 3/12, ll = "Stage 2", rp = .7),
+  d79 = list(mm = .30,  pp = 5/12, ll = "Stage 2", rp = .7),
+  d80 = list(mm = .60,  pp = 5/12, ll = "Stage 2", rp = .7),
+  d81 = list(mm = 1.40, pp = 5/12, ll = "Stage 2", rp = .7),
+  d82 = list(mm = .30,  pp = 1/12, ll = "Stage 2", rp = .5),
+  d83 = list(mm = .60,  pp = 1/12, ll = "Stage 2", rp = .5),
+  d84 = list(mm = 1.40, pp = 1/12, ll = "Stage 2", rp = .5),
+  d85 = list(mm = .30,  pp = 3/12, ll = "Stage 2", rp = .5),
+  d86 = list(mm = .60,  pp = 3/12, ll = "Stage 2", rp = .5),
+  d87 = list(mm = 1.40, pp = 3/12, ll = "Stage 2", rp = .5),
+  d88 = list(mm = .30,  pp = 5/12, ll = "Stage 2", rp = .5),
+  d89 = list(mm = .60,  pp = 5/12, ll = "Stage 2", rp = .5),
+  d90 = list(mm = 1.40, pp = 5/12, ll = "Stage 2", rp = .5)
+)
+
+```
+
+
+
+
+```{r}
+data_generation = function(ii, dd, DIFcountry, sample_size){
+  #define path
+  path = "C:/Users/Montse/OneDrive - Indiana University/Dissertation/Data Analysis/Paper 1"
+  # set seed for replication
+  set.seed(47405*ii)
+  # select from dif conditions EDIT
+  mm = DIF_conditions[[dd]][[1]] # DIF magnitude
+  pp = DIF_conditions[[dd]][[2]] # DIF percentage
+  ll = DIF_conditions[[dd]][[3]] # DIF location
+  rp = DIF_conditions[[dd]][[4]] # routing probability
+  
+  
+  #----------------------------------------#
+  ## Simulate Group Proficiency 
+  #----------------------------------------#
+  theta <- NULL
+  theta <- rnorm(sample_size,
+                     mean = as.numeric(achievement[DIFcountry, "Theta"]),
+                     sd   = as.numeric(achievement[DIFcountry, "ThetaSD"]))
+  
+  #----------------------------------------#
+  ## Simulate Item Parameters 
+  #----------------------------------------#
+  # No DIF
+  items = items
+  
+  test_length = nrow(items)/6
+  # DIF conditions matrix per module
+  addDIF<-data.frame(V1 = c(rep(0, test_length)), # for discrimination parameter
+                     V2 = c(rep(mm, round(test_length*pp, 0)), # for first location
+                               rep(0, round(test_length*(1-pp),0))),   #parameters
+                     V3 = c(rep(0, test_length)),
+                     V4 = c(rep(0, test_length)))
+  #matrix of zeros
+  zeros_m<-data.frame(V1 = c(rep(0, test_length)), # for discrimination parameter
+                     V2 = c(rep(0, test_length)),
+                     V3 = c(rep(0, test_length)),
+                     V4 = c(rep(0, test_length)))
+  
+  #DIF location 
+  if (ll == "Core"){
+  addDIF1 <- rbind(addDIF, zeros_m, zeros_m, zeros_m, zeros_m, zeros_m)  
+  }else if(ll == "Stage 1"){
+  addDIF1 <- rbind(zeros_m, addDIF, addDIF, zeros_m, zeros_m, zeros_m)    
+  }else if(ll == "Stage 2"){
+  addDIF1 <- rbind(zeros_m, zeros_m, zeros_m, addDIF, addDIF, addDIF)  
+  }
+  
+  
+  # adding DIF to the difficulty parameter only according to country with DIF 
+  if (DIFcountry %in% c(1,2,3)){             # high performers
+    items_dif = as.data.frame(items[3:ncol(items)] - addDIF1)
+  }else if (DIFcountry %in% c(4,5,6,7,8,9)){ # medium and low performers
+    items_dif = as.data.frame(items[3:ncol(items)] + addDIF1)
+  }else if(DIFcountry == 0) {                # Baseline
+    items_dif = as.data.frame(items[3:ncol(items)])  
+    }
+  
+  
+  # Item parameters for group 1 and group 2
+  Allitems = data.frame(rep = ii, 
+                        condition = dd,
+                        DIFmag = mm,
+                        DIFper = pp,
+                        DIFloc = ll, 
+                        DIFcntry = DIFcountry, 
+                        Prob = rp,
+                        N = sample_size,
+                        item = paste0("i", 1:72),
+                        items, items_dif)
+  
+  #===============================================================================
+  #                    MST Response Simulation 
+  #===============================================================================
+  ## Set up an empty dataframe for responses
+  GenData = data.frame(rep = ii, 
+                      condition = dd,
+                      DIFmag = mm,
+                      DIFper = pp,
+                      DIFloc = ll, 
+                      DIFcntry = DIFcountry, 
+                      Prob = rp,
+                      N = sample_size,
+                      TH0 = theta,
+                      i = matrix(NA, ncol = 72))
+  ### Attach the module membership to each item
+  it_mod <- data.frame(items_dif,
+                       mod = c(rep(1, 12), rep(2, 12), rep(3, 12), 
+                               rep(4, 12), rep(5, 12), rep(6, 12)))
+
+
+  # Use of score estimation for routing
+  start <- list(fixModule = 1)
+  test <- list(method = "score", 
+               cutoff = cut_score, 
+               prob = rp)
+  final <- list(method = "score") 
+  
+  res = NULL
+  for (kk in 1:sample_size){
+  res = randomMST(trueTheta = GenData[kk, "TH0"],
+                                   itemBank = items_dif[, c("a","b","c","d")], 
+                                   modules = modules, 
+                                   transMatrix = trans, start = start, 
+                                   test = test, final = final)
+   
+  GenData[ kk, paste0("i.", c(res$testItems)) ] <- res$pattern
+  GenData[ kk, c("OP1", "OP2")] <- res$best.module
+  GenData[ kk, c("MOD1", "MOD2", "MOD3")] <- c( res$selected.modules )
+  }        
+  saveObject(Allitems, file = paste0(path, "/Results/Generated items/items_c", dd,
+                                     "_N", sample_size, "_Country", DIFcountry,
+                                     "_r", ii, ".Rbin"))
+  saveObject(GenData, file = paste0(path, "/Results/Generated responses/responses_c", dd, 
+                                     "_N", sample_size, "_Country", DIFcountry,
+                                     "_r", ii, ".Rbin"))
+}
+
+#data_generation(ii = 1, dd = 64, DIFcountry = 4, sample_size = 40000)
+
+
+```
+
+### Data generation paralelization
+
+```{r}
+library("parallel")
+library("doParallel")
+```
+
+
+```{r}
+Nsim = 100
+# Set parallel 
+no_cores <- detectCores()        #number of cores that will be used
+cl <- makeCluster(no_cores-4)    #creates copies of R to run on cores (i.e., computational clusters)
+registerDoParallel(cl)           #register parallel backend 
+
+
+clusterExport(cl,list('DIF_conditions', 'data_generation',
+                      'itembank', 'items', 'achievement',
+                      'modules', 'trans', 'cut_score', 'path',
+                      'saveObject', 'Nsim', 'randomMST'), 
+              envir=environment())
+
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 1, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 2, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 3, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 4, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 5, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 6, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 7, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 8, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 9, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 10, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 11, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 12, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 13, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 14, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 15, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 16, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 17, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 18, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 19, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 20, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 21, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 22, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 23, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 24, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 25, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 26, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 27, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 28, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 29, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 30, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 31, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 32, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 33, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 34, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 35, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 36, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 37, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 38, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 39, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 40, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 41, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 42, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 43, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 44, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 45, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 46, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 47, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 48, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 49, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 50, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 51, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 52, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 53, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 54, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 55, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 56, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 57, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 58, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 59, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 60, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 61, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 62, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 63, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 64, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 65, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 66, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 67, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 68, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 69, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 70, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 71, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 72, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 73, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 74, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 75, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 76, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 77, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 78, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 79, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 80, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 81, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 82, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 83, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 84, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 85, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 86, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 87, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 88, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 89, sample_size = 4000, DIFcountry = 1))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 90, sample_size = 4000, DIFcountry = 1))
+# stop the core division
+stopCluster(cl)
+
+
+```
+
+
+```{r}
+Nsim = 100
+# Set parallel 
+no_cores <- detectCores()        #number of cores that will be used
+cl <- makeCluster(no_cores-4)    #creates copies of R to run on cores (i.e., computational clusters)
+registerDoParallel(cl)           #register parallel backend 
+
+
+clusterExport(cl,list('DIF_conditions', 'data_generation',
+                      'itembank', 'items', 'achievement',
+                      'modules', 'trans', 'cut_score', 'path',
+                      'saveObject', 'Nsim', 'randomMST'), 
+              envir=environment())
+
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 1, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 2, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 3, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 4, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 5, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 6, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 7, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 8, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 9, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 10, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 11, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 12, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 13, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 14, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 15, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 16, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 17, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 18, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 19, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 20, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 21, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 22, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 23, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 24, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 25, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 26, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 27, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 28, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 29, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 30, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 31, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 32, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 33, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 34, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 35, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 36, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 37, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 38, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 39, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 40, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 41, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 42, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 43, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 44, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 45, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 46, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 47, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 48, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 49, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 50, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 51, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 52, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 53, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 54, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 55, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 56, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 57, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 58, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 59, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 60, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 61, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 62, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 63, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 64, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 65, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 66, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 67, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 68, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 69, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 70, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 71, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 72, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 73, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 74, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 75, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 76, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 77, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 78, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 79, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 80, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 81, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 82, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 83, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 84, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 85, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 86, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 87, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 88, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 89, sample_size = 4000, DIFcountry = 2))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 90, sample_size = 4000, DIFcountry = 2))
+# stop the core division
+stopCluster(cl)
+```
+
+
+```{r}
+Nsim = 100
+# Set parallel 
+no_cores <- detectCores()        #number of cores that will be used
+cl <- makeCluster(no_cores-4)    #creates copies of R to run on cores (i.e., computational clusters)
+registerDoParallel(cl)           #register parallel backend 
+
+
+clusterExport(cl,list('DIF_conditions', 'data_generation',
+                      'itembank', 'items', 'achievement',
+                      'modules', 'trans', 'cut_score', 'path',
+                      'saveObject', 'Nsim', 'randomMST'), 
+              envir=environment())
+
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 1, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 2, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 3, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 4, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 5, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 6, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 7, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 8, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 9, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 10, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 11, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 12, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 13, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 14, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 15, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 16, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 17, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 18, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 19, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 20, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 21, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 22, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 23, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 24, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 25, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 26, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 27, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 28, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 29, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 30, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 31, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 32, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 33, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 34, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 35, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 36, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 37, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 38, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 39, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 40, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 41, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 42, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 43, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 44, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 45, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 46, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 47, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 48, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 49, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 50, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 51, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 52, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 53, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 54, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 55, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 56, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 57, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 58, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 59, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 60, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 61, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 62, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 63, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 64, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 65, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 66, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 67, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 68, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 69, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 70, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 71, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 72, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 73, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 74, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 75, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 76, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 77, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 78, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 79, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 80, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 81, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 82, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 83, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 84, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 85, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 86, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 87, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 88, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 89, sample_size = 4000, DIFcountry = 3))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 90, sample_size = 4000, DIFcountry = 3))
+# stop the core division
+stopCluster(cl)
+```
+
+```{r}
+Nsim = 100
+# Set parallel 
+no_cores <- detectCores()        #number of cores that will be used
+cl <- makeCluster(no_cores-4)    #creates copies of R to run on cores (i.e., computational clusters)
+registerDoParallel(cl)           #register parallel backend 
+
+
+clusterExport(cl,list('DIF_conditions', 'data_generation',
+                      'itembank', 'items', 'achievement',
+                      'modules', 'trans', 'cut_score', 'path',
+                      'saveObject', 'Nsim', 'randomMST'), 
+              envir=environment())
+
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 1, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 2, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 3, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 4, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 5, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 6, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 7, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 8, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 9, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 10, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 11, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 12, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 13, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 14, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 15, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 16, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 17, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 18, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 19, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 20, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 21, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 22, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 23, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 24, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 25, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 26, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 27, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 28, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 29, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 30, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 31, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 32, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 33, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 34, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 35, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 36, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 37, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 38, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 39, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 40, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 41, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 42, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 43, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 44, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 45, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 46, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 47, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 48, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 49, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 50, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 51, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 52, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 53, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 54, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 55, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 56, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 57, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 58, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 59, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 60, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 61, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 62, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 63, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 64, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 65, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 66, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 67, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 68, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 69, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 70, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 71, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 72, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 73, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 74, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 75, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 76, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 77, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 78, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 79, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 80, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 81, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 82, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 83, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 84, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 85, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 86, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 87, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 88, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 89, sample_size = 4000, DIFcountry = 4))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 90, sample_size = 4000, DIFcountry = 4))
+# stop the core division
+stopCluster(cl)
+```
+
+```{r}
+Nsim = 100
+# Set parallel 
+no_cores <- detectCores()        #number of cores that will be used
+cl <- makeCluster(no_cores-4)    #creates copies of R to run on cores (i.e., computational clusters)
+registerDoParallel(cl)           #register parallel backend 
+
+
+clusterExport(cl,list('DIF_conditions', 'data_generation',
+                      'itembank', 'items', 'achievement',
+                      'modules', 'trans', 'cut_score', 'path',
+                      'saveObject', 'Nsim', 'randomMST'), 
+              envir=environment())
+
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 1, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 2, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 3, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 4, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 5, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 6, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 7, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 8, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 9, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 10, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 11, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 12, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 13, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 14, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 15, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 16, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 17, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 18, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 19, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 20, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 21, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 22, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 23, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 24, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 25, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 26, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 27, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 28, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 29, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 30, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 31, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 32, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 33, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 34, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 35, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 36, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 37, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 38, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 39, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 40, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 41, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 42, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 43, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 44, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 45, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 46, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 47, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 48, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 49, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 50, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 51, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 52, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 53, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 54, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 55, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 56, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 57, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 58, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 59, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 60, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 61, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 62, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 63, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 64, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 65, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 66, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 67, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 68, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 69, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 70, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 71, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 72, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 73, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 74, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 75, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 76, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 77, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 78, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 79, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 80, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 81, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 82, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 83, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 84, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 85, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 86, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 87, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 88, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 89, sample_size = 4000, DIFcountry = 5))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 90, sample_size = 4000, DIFcountry = 5))
+# stop the core division
+stopCluster(cl)
+```
+
+```{r}
+Nsim = 100
+# Set parallel 
+no_cores <- detectCores()        #number of cores that will be used
+cl <- makeCluster(no_cores-4)    #creates copies of R to run on cores (i.e., computational clusters)
+registerDoParallel(cl)           #register parallel backend 
+
+
+clusterExport(cl,list('DIF_conditions', 'data_generation',
+                      'itembank', 'items', 'achievement',
+                      'modules', 'trans', 'cut_score', 'path',
+                      'saveObject', 'Nsim', 'randomMST'), 
+              envir=environment())
+
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 1, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 2, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 3, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 4, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 5, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 6, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 7, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 8, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 9, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 10, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 11, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 12, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 13, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 14, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 15, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 16, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 17, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 18, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 19, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 20, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 21, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 22, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 23, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 24, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 25, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 26, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 27, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 28, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 29, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 30, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 31, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 32, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 33, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 34, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 35, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 36, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 37, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 38, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 39, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 40, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 41, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 42, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 43, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 44, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 45, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 46, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 47, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 48, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 49, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 50, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 51, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 52, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 53, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 54, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 55, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 56, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 57, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 58, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 59, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 60, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 61, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 62, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 63, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 64, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 65, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 66, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 67, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 68, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 69, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 70, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 71, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 72, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 73, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 74, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 75, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 76, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 77, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 78, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 79, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 80, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 81, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 82, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 83, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 84, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 85, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 86, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 87, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 88, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 89, sample_size = 4000, DIFcountry = 6))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 90, sample_size = 4000, DIFcountry = 6))
+# stop the core division
+stopCluster(cl)
+```
+
+```{r}
+Nsim = 100
+# Set parallel 
+no_cores <- detectCores()        #number of cores that will be used
+cl <- makeCluster(no_cores-4)    #creates copies of R to run on cores (i.e., computational clusters)
+registerDoParallel(cl)           #register parallel backend 
+
+
+clusterExport(cl,list('DIF_conditions', 'data_generation',
+                      'itembank', 'items', 'achievement',
+                      'modules', 'trans', 'cut_score', 'path',
+                      'saveObject', 'Nsim', 'randomMST'), 
+              envir=environment())
+
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 1, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 2, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 3, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 4, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 5, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 6, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 7, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 8, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 9, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 10, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 11, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 12, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 13, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 14, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 15, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 16, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 17, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 18, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 19, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 20, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 21, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 22, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 23, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 24, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 25, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 26, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 27, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 28, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 29, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 30, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 31, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 32, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 33, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 34, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 35, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 36, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 37, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 38, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 39, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 40, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 41, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 42, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 43, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 44, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 45, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 46, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 47, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 48, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 49, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 50, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 51, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 52, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 53, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 54, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 55, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 56, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 57, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 58, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 59, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 60, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 61, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 62, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 63, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 64, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 65, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 66, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 67, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 68, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 69, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 70, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 71, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 72, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 73, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 74, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 75, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 76, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 77, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 78, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 79, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 80, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 81, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 82, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 83, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 84, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 85, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 86, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 87, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 88, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 89, sample_size = 4000, DIFcountry = 7))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 90, sample_size = 4000, DIFcountry = 7))
+# stop the core division
+stopCluster(cl)
+```
+
+```{r}
+Nsim = 100
+# Set parallel 
+no_cores <- detectCores()        #number of cores that will be used
+cl <- makeCluster(no_cores-4)    #creates copies of R to run on cores (i.e., computational clusters)
+registerDoParallel(cl)           #register parallel backend 
+
+
+clusterExport(cl,list('DIF_conditions', 'data_generation',
+                      'itembank', 'items', 'achievement',
+                      'modules', 'trans', 'cut_score', 'path',
+                      'saveObject', 'Nsim', 'randomMST'), 
+              envir=environment())
+
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 1, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 2, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 3, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 4, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 5, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 6, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 7, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 8, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 9, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 10, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 11, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 12, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 13, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 14, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 15, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 16, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 17, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 18, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 19, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 20, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 21, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 22, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 23, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 24, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 25, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 26, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 27, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 28, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 29, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 30, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 31, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 32, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 33, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 34, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 35, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 36, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 37, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 38, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 39, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 40, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 41, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 42, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 43, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 44, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 45, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 46, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 47, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 48, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 49, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 50, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 51, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 52, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 53, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 54, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 55, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 56, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 57, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 58, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 59, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 60, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 61, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 62, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 63, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 64, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 65, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 66, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 67, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 68, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 69, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 70, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 71, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 72, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 73, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 74, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 75, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 76, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 77, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 78, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 79, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 80, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 81, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 82, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 83, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 84, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 85, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 86, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 87, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 88, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 89, sample_size = 4000, DIFcountry = 8))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 90, sample_size = 4000, DIFcountry = 8))
+# stop the core division
+stopCluster(cl)
+```
+
+```{r}
+Nsim = 100
+# Set parallel 
+no_cores <- detectCores()        #number of cores that will be used
+cl <- makeCluster(no_cores-4)    #creates copies of R to run on cores (i.e., computational clusters)
+registerDoParallel(cl)           #register parallel backend 
+
+
+clusterExport(cl,list('DIF_conditions', 'data_generation',
+                      'itembank', 'items', 'achievement',
+                      'modules', 'trans', 'cut_score', 'path',
+                      'saveObject', 'Nsim', 'randomMST'), 
+              envir=environment())
+
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 1, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 2, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 3, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 4, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 5, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 6, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 7, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 8, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 9, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 10, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 11, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 12, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 13, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 14, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 15, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 16, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 17, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 18, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 19, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 20, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 21, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 22, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 23, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 24, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 25, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 26, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 27, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 28, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 29, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 30, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 31, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 32, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 33, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 34, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 35, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 36, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 37, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 38, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 39, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 40, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 41, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 42, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 43, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 44, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 45, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 46, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 47, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 48, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 49, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 50, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 51, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 52, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 53, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 54, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 55, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 56, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 57, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 58, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 59, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 60, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 61, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 62, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 63, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 64, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 65, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 66, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 67, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 68, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 69, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 70, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 71, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 72, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 73, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 74, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 75, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 76, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 77, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 78, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 79, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 80, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 81, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 82, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 83, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 84, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 85, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 86, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 87, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 88, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 89, sample_size = 4000, DIFcountry = 9))
+parSapply(cl, 1:Nsim, function(ii) data_generation(ii, dd = 90, sample_size = 4000, DIFcountry = 9))
+# stop the core division
+stopCluster(cl)
+```
+
+
